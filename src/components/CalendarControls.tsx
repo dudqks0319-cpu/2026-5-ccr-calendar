@@ -30,21 +30,25 @@ export function CalendarControls({
   );
 
   return (
-    <section className="no-print mx-auto grid max-w-[1480px] gap-3 px-4 py-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div className="grid w-full grid-cols-[78px_1fr_78px] items-center gap-2 lg:w-auto lg:grid-cols-[auto_auto_auto]">
+    <section className="no-print mx-auto grid max-w-[1480px] gap-3 px-4 py-3">
+      <div className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid items-center gap-3 lg:grid-cols-[1fr_auto_1fr]">
+          <div className="hidden text-xs font-bold text-slate-500 lg:block">
+            월간/연간 보기
+          </div>
+          <div className="grid w-full grid-cols-[92px_minmax(150px,auto)_92px] items-center justify-center gap-2 sm:flex sm:w-auto sm:gap-3">
           <Button
             type="button"
             variant="secondary"
             onClick={onPreviousMonth}
             aria-label="이전 달"
-            className="w-full min-w-0 px-1 text-xs"
+            className="w-full min-w-0 px-2 text-sm sm:w-24"
           >
             ◀ 이전
           </Button>
           <button
             type="button"
-            className="min-h-10 min-w-0 rounded-md px-1 text-center text-base font-black text-slate-950 transition hover:bg-slate-100 lg:px-4 lg:text-xl"
+            className="min-h-11 min-w-0 rounded-md border border-slate-200 bg-slate-50 px-3 text-center text-lg font-black text-slate-950 transition hover:bg-slate-100 sm:min-w-48 sm:px-6 sm:text-xl"
             onClick={onToggleView}
           >
             {state.selectedYear}년 {state.selectedMonthIndex + 1}월
@@ -54,13 +58,17 @@ export function CalendarControls({
             variant="secondary"
             onClick={onNextMonth}
             aria-label="다음 달"
-            className="w-full min-w-0 px-1 text-xs"
+            className="w-full min-w-0 px-2 text-sm sm:w-24"
           >
             다음 ▶
           </Button>
+          </div>
+          <div className="hidden justify-self-end text-xs font-bold text-slate-500 lg:block">
+            기준 설정
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
           <Field label="연도">
             <Select
               value={state.selectedYear}

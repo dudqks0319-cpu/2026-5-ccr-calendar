@@ -71,6 +71,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
   const monthCTeamText = namesToText(
     state.monthCTeams[monthKey] || getMonthCTeamMembers(state, state.selectedYear, state.selectedMonthIndex),
   );
+  const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || '설정';
 
   function updateDayTeam(teamKey: TeamKey, membersText: string) {
     onChange({
@@ -123,20 +124,33 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
   }
 
   return (
-    <Modal title="설정" onClose={onClose} width="max-w-5xl">
-      <div className="grid gap-5">
-        <div className="no-print flex flex-wrap gap-2">
+    <Modal title="설정" onClose={onClose} width="max-w-6xl">
+      <div className="grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)]">
+        <aside className="no-print rounded-lg border border-slate-200 bg-slate-50 p-2">
+          <div className="px-2 pb-2 text-xs font-black text-slate-500">설정 항목</div>
+          <div className="grid gap-1">
           {tabs.map((tab) => (
             <Button
               key={tab.key}
               type="button"
               variant={activeTab === tab.key ? 'primary' : 'secondary'}
               onClick={() => setActiveTab(tab.key)}
+              className="w-full justify-start"
             >
               {tab.label}
             </Button>
           ))}
-        </div>
+          </div>
+        </aside>
+
+        <div className="grid min-w-0 gap-4">
+          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-black text-slate-950">{activeTabLabel}</h3>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                {state.selectedYear}년 {state.selectedMonthIndex + 1}월 기준
+              </span>
+            </div>
 
         {activeTab === 'teams' ? (
           <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
@@ -557,6 +571,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
             </Field>
           </div>
         ) : null}
+          </section>
 
         <div className="flex justify-between border-t border-slate-200 pt-4">
           <Button
@@ -590,6 +605,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
           <Button type="button" onClick={onClose}>
             저장 후 닫기
           </Button>
+        </div>
         </div>
       </div>
     </Modal>
