@@ -7,6 +7,7 @@ import {
   generateMonthSchedule,
   getMonthCTeamMembers,
   getTwoWeekTeamLabel,
+  isDateOff,
   isNightWeek,
 } from '../src/logic/generateMonthSchedule.js';
 import { getSealerTeam } from '../src/logic/getSealerTeam.js';
@@ -245,6 +246,55 @@ test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이
 
   assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-03')?.comment, '지방선거');
   assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-06')?.comment, '현충일');
+});
+
+test('6월 기본 OFF 토요일은 특근 ON이면 근무일, 특근 OFF이면 다시 OFF가 된다', () => {
+  const baseState = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+  });
+
+  assert.equal(isDateOff('2026-06-13', 6, baseState), true);
+
+  const overtimeOnState: CCRCalendarState = {
+    ...baseState,
+    saturdayOvertime: {
+      ...baseState.saturdayOvertime,
+      '2026-06-13': true,
+    },
+    overrides: {
+      ...baseState.overrides,
+      '2026-06-13': {
+        ...baseState.overrides['2026-06-13'],
+        isSaturdayOvertime: true,
+        isOff: false,
+      },
+    },
+  };
+  const overtimeOnDay = generateMonthSchedule(overtimeOnState, 2026, 5).days.find(
+    (day) => day.dateKey === '2026-06-13',
+  );
+  assert.equal(isDateOff('2026-06-13', 6, overtimeOnState), false);
+  assert.equal(overtimeOnDay?.isOff, false);
+  assert.equal(overtimeOnDay?.isSaturdayOvertime, true);
+
+  const { isOff: _removedIsOff, ...overtimeOffOverride } = overtimeOnState.overrides['2026-06-13'];
+  const overtimeOffState: CCRCalendarState = {
+    ...overtimeOnState,
+    saturdayOvertime: {
+      ...overtimeOnState.saturdayOvertime,
+      '2026-06-13': false,
+    },
+    overrides: {
+      ...overtimeOnState.overrides,
+      '2026-06-13': {
+        ...overtimeOffOverride,
+        isSaturdayOvertime: false,
+      },
+    },
+  };
+  assert.equal(isDateOff('2026-06-13', 6, overtimeOffState), true);
 });
 
 test('2026년 4월 사진 기준 C조, 토요일 OFF, 2주 팀 라벨, 날짜별 CCR 조합을 검증한다', () => {

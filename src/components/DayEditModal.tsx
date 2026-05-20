@@ -83,6 +83,16 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
             disabled={day.dayOfWeek !== 6}
             onClick={() => {
               const nextValue = !isCurrentSaturdayOvertime;
+              const nextOverride = {
+                ...override,
+                isSaturdayOvertime: nextValue,
+              };
+              if (nextValue) {
+                nextOverride.isOff = false;
+              } else {
+                delete nextOverride.isOff;
+              }
+
               onChange({
                 ...state,
                 saturdayOvertime: {
@@ -91,10 +101,7 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
                 },
                 overrides: {
                   ...state.overrides,
-                  [day.dateKey]: {
-                    ...override,
-                    isSaturdayOvertime: nextValue,
-                  },
+                  [day.dateKey]: nextOverride,
                 },
               });
             }}
