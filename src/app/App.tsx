@@ -78,8 +78,11 @@ export default function App() {
         state.ui.pdfScale,
       );
       setAutosaveStatus('PDF 저장 완료');
-    } catch {
-      setAutosaveStatus('PDF 저장 실패');
+    } catch (error) {
+      console.error('PDF export failed', error);
+      setAutosaveStatus(
+        error instanceof Error ? `PDF 저장 실패 · ${error.message}` : 'PDF 저장 실패',
+      );
     }
   }
 
