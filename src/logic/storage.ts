@@ -1,10 +1,12 @@
 import { DEFAULT_STATE, STORAGE_KEY } from '../constants/defaults.js';
+import { applyJune2026PhotoPreset } from '../constants/june2026Preset.js';
 import { applyMay2026PhotoPreset } from '../constants/may2026Preset.js';
 import type { CCRCalendarState } from '../types/ccr.js';
 import { downloadTextFile, toDateKey } from '../utils/date.js';
 
 function cloneDefaultState(): CCRCalendarState {
-  return applyMay2026PhotoPreset(JSON.parse(JSON.stringify(DEFAULT_STATE)) as CCRCalendarState);
+  const state = JSON.parse(JSON.stringify(DEFAULT_STATE)) as CCRCalendarState;
+  return applyJune2026PhotoPreset(applyMay2026PhotoPreset(state));
 }
 
 export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState {
@@ -19,6 +21,30 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
     cTeams: {
       ...defaults.cTeams,
       ...parsed.cTeams,
+    },
+    monthStartWithNight: {
+      ...defaults.monthStartWithNight,
+      ...parsed.monthStartWithNight,
+    },
+    offDays: {
+      ...defaults.offDays,
+      ...parsed.offDays,
+    },
+    overrides: {
+      ...defaults.overrides,
+      ...parsed.overrides,
+    },
+    comments: {
+      ...defaults.comments,
+      ...parsed.comments,
+    },
+    monthMemo: {
+      ...defaults.monthMemo,
+      ...parsed.monthMemo,
+    },
+    saturdayOvertime: {
+      ...defaults.saturdayOvertime,
+      ...parsed.saturdayOvertime,
     },
     materialRule: {
       ...defaults.materialRule,

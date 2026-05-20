@@ -6,6 +6,7 @@ import type {
   MonthSchedule,
 } from '../types/ccr.js';
 import { getDaysInMonth, toDateKey } from '../utils/date.js';
+import { toMonthKey } from '../utils/date.js';
 import { buildBaseRotation } from './buildBaseRotation.js';
 import { getMaterialWorker } from './getMaterialWorker.js';
 import { getSealerTeam } from './getSealerTeam.js';
@@ -95,6 +96,14 @@ export function isDateOff(dateKey: string, isSunday: boolean, state: CCRCalendar
   return isSunday;
 }
 
+export function getMonthStartWithNight(
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+) {
+  return state.monthStartWithNight[toMonthKey(year, monthIndex)] ?? state.startWithNight;
+}
+
 export function generateMonthSchedule(
   state: CCRCalendarState,
   year = state.selectedYear,
@@ -105,6 +114,7 @@ export function generateMonthSchedule(
   const baseRotation = buildBaseRotation(state.dayTeams);
   const selectedCTeamMembers =
     state.cTeams[state.selectedCTeamKey]?.members.filter(Boolean) || [];
+  const startWithNight = getMonthStartWithNight(state, year, monthIndex);
   const days: CalendarDay[] = [];
   let pointer = 0;
 
@@ -114,7 +124,7 @@ export function generateMonthSchedule(
     const dayOfWeek = date.getDay();
     const isSunday = dayOfWeek === 0;
     const isOff = isDateOff(dateKey, isSunday, state);
-    const isNight = isNightWeek(day, firstDayOfMonthWeekday, state.startWithNight);
+    const isNight = isNightWeek(day, firstDayOfMonthWeekday, startWithNight);
     const override = state.overrides[dateKey];
     const materialWorker =
       override?.materialWorker || state.materialRule.dateWorkers[dateKey] || getMaterialWorker(dateKey, state);

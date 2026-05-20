@@ -16,7 +16,9 @@ function includesSearch(day: CalendarDay, searchTerm: string) {
 export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
   const matched = includesSearch(day, searchTerm);
   const displayCTeamText = day.cTeamText.replaceAll(',', '');
-  const isHoliday = ['노동절', '어린이날', '석가탄신일'].includes(day.comment);
+  const isHoliday = ['노동절', '어린이날', '석가탄신일', '지방선거', '현충일'].includes(
+    day.comment,
+  );
   const isSaturdayOff = day.dayOfWeek === 6 && day.isOff;
   const isSunday = day.dayOfWeek === 0;
   const shiftBadge = day.isNight ? '야' : '주';

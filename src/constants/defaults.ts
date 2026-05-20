@@ -7,6 +7,7 @@ export const DEFAULT_STATE: CCRCalendarState = {
   selectedYear: 2026,
   selectedMonthIndex: 4,
   startWithNight: false,
+  monthStartWithNight: {},
   selectedCTeamKey: 'A',
   dayTeams: {
     conveyor: {

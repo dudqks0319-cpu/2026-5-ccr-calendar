@@ -69,7 +69,10 @@ export function MonthCalendar({
 
       <div className="grid grid-cols-7 overflow-hidden border-l border-slate-200">
         {emptyPrefix.map((index) => (
-          <div key={`empty-${index}`} className="min-h-[126px] border-r border-t border-slate-200 bg-white" />
+          <div
+            key={`empty-${index}`}
+            className="calendar-empty-day min-h-[126px] border-r border-t border-slate-200 bg-white"
+          />
         ))}
         {schedule.days.map((day) => (
           <DayCell key={day.dateKey} day={day} searchTerm={searchTerm} onClick={onDayClick} />
@@ -84,7 +87,7 @@ export function MonthCalendar({
           id="monthMemo"
           value={monthMemo}
           placeholder="월 전체 공지, 특이사항, 교대 이슈를 기록하세요."
-          className="min-h-32 resize-none border-0 font-mono text-base leading-8 text-slate-700 focus:border-transparent focus:ring-0"
+          className="screen-month-memo min-h-32 resize-none border-0 font-mono text-base leading-8 text-slate-700 focus:border-transparent focus:ring-0"
           onChange={(event) =>
             onChange({
               ...state,
@@ -95,6 +98,9 @@ export function MonthCalendar({
             })
           }
         />
+        <div className="print-month-memo hidden whitespace-pre-wrap font-mono text-base leading-8 text-slate-700">
+          {monthMemo}
+        </div>
       </div>
     </section>
   );

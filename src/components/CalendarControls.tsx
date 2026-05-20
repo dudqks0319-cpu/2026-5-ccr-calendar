@@ -1,6 +1,8 @@
 import type { CCRCalendarState, CTeamKey } from '../types/ccr.js';
 import { C_TEAM_KEYS } from '../constants/defaults.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
+import { getMonthStartWithNight } from '../logic/generateMonthSchedule.js';
+import { toMonthKey } from '../utils/date.js';
 import { Button, Field, Select } from './ui.js';
 
 type CalendarControlsProps = {
@@ -20,6 +22,12 @@ export function CalendarControls({
 }: CalendarControlsProps) {
   const allWorkers = buildBaseRotation(state.dayTeams);
   const years = Array.from({ length: 11 }, (_, index) => state.selectedYear - 5 + index);
+  const monthKey = toMonthKey(state.selectedYear, state.selectedMonthIndex);
+  const currentStartWithNight = getMonthStartWithNight(
+    state,
+    state.selectedYear,
+    state.selectedMonthIndex,
+  );
 
   return (
     <section className="no-print mx-auto grid max-w-[1480px] gap-3 px-4 py-4">
@@ -110,15 +118,20 @@ export function CalendarControls({
           <Field label="시작">
             <Button
               type="button"
-              variant={state.startWithNight ? 'primary' : 'secondary'}
-              onClick={() =>
+              variant={currentStartWithNight ? 'primary' : 'secondary'}
+              onClick={() => {
+                const nextStartWithNight = !currentStartWithNight;
                 onChange({
                   ...state,
-                  startWithNight: !state.startWithNight,
-                })
-              }
+                  startWithNight: nextStartWithNight,
+                  monthStartWithNight: {
+                    ...state.monthStartWithNight,
+                    [monthKey]: nextStartWithNight,
+                  },
+                });
+              }}
             >
-              {state.startWithNight ? '🌙 야간' : '☀ 주간'}
+              {currentStartWithNight ? '🌙 야간' : '☀ 주간'}
             </Button>
           </Field>
 

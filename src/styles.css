@@ -28,24 +28,115 @@ textarea {
   font: inherit;
 }
 
+@page {
+  size: A4 landscape;
+  margin: 7mm;
+}
+
 @media print {
+  html,
   body {
     background: white;
+    margin: 0;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
   .no-print {
     display: none !important;
   }
 
+  main,
+  main > div {
+    margin: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+
   #print-area {
-    width: 100%;
+    box-sizing: border-box;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
     background: white;
+    padding: 0 !important;
     box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  #print-area h2 {
+    font-size: 21pt !important;
+    line-height: 1.1 !important;
+  }
+
+  #print-area p {
+    font-size: 12pt !important;
+    line-height: 1.2 !important;
+  }
+
+  #print-area > div:first-child {
+    margin-bottom: 5mm !important;
+    padding-bottom: 3mm !important;
+  }
+
+  #print-area .grid.grid-cols-7 > div {
+    min-width: 0 !important;
+  }
+
+  .calendar-empty-day,
+  .calendar-day {
+    min-height: 22mm !important;
   }
 
   .calendar-day {
-    min-height: 150px;
     break-inside: avoid;
-    font-size: 10px;
+    padding: 1.5mm !important;
+    font-size: 8pt !important;
+  }
+
+  .calendar-day .text-xl {
+    font-size: 12pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .calendar-day .text-base {
+    font-size: 8.5pt !important;
+    line-height: 1.15 !important;
+  }
+
+  .calendar-day .text-sm {
+    font-size: 7.5pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .calendar-day .text-xs {
+    font-size: 6.5pt !important;
+    line-height: 1.1 !important;
+  }
+
+  .calendar-day .size-6 {
+    height: 4.5mm !important;
+    width: 4.5mm !important;
+  }
+
+  .screen-month-memo {
+    display: none !important;
+  }
+
+  .print-month-memo {
+    display: block !important;
+    min-height: 30mm !important;
+    font-size: 9pt !important;
+    line-height: 1.7 !important;
+  }
+
+  #print-area > div:last-child {
+    margin-top: 5mm !important;
+    padding: 4mm !important;
   }
 }

@@ -71,6 +71,7 @@ export type CCRCalendarState = {
   selectedYear: number;
   selectedMonthIndex: number;
   startWithNight: boolean;
+  monthStartWithNight: Record<string, boolean>;
   selectedCTeamKey: CTeamKey;
   dayTeams: Record<TeamKey, TeamConfig>;
   cTeams: Record<CTeamKey, CTeamConfig>;

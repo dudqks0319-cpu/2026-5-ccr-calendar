@@ -5,6 +5,7 @@ import { DEFAULT_STATE } from '../src/constants/defaults.js';
 import { buildBaseRotation } from '../src/logic/buildBaseRotation.js';
 import { generateMonthSchedule, isNightWeek } from '../src/logic/generateMonthSchedule.js';
 import { getSealerTeam } from '../src/logic/getSealerTeam.js';
+import { mergeState } from '../src/logic/storage.js';
 
 function stateWith(partial: Partial<CCRCalendarState>): CCRCalendarState {
   return {
@@ -189,4 +190,60 @@ test('주간/야간 주차는 첫 주 시작 설정에 따라 반전된다', () 
   assert.equal(isNightWeek(4, 5, false), true);
   assert.equal(isNightWeek(1, 5, true), true);
   assert.equal(isNightWeek(4, 5, true), false);
+});
+
+test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이어지고 토요일 특근이 없다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+  });
+  const schedule = generateMonthSchedule(state, 2026, 5);
+
+  const expectedAssignments: Record<string, [string, string]> = {
+    '2026-06-01': ['동인', '민혁'],
+    '2026-06-02': ['민혁', '선우'],
+    '2026-06-04': ['선우', '찬우'],
+    '2026-06-05': ['찬우', '이진'],
+    '2026-06-08': ['이진', '윤수'],
+    '2026-06-12': ['승현', '호빈'],
+    '2026-06-15': ['호빈', '광수'],
+    '2026-06-19': ['동인', '민혁'],
+    '2026-06-22': ['민혁', '선우'],
+    '2026-06-26': ['윤수', '성광'],
+    '2026-06-29': ['성광', '성운'],
+    '2026-06-30': ['성운', '승현'],
+  };
+
+  for (const [dateKey, assignment] of Object.entries(expectedAssignments)) {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    assert.deepEqual([day?.am, day?.pm], assignment);
+  }
+
+  for (const dateKey of ['2026-06-06', '2026-06-13', '2026-06-20', '2026-06-27']) {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    assert.equal(day?.isOff, true);
+    assert.equal(day?.isSaturdayOvertime, false);
+  }
+
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-03')?.comment, '지방선거');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-06')?.comment, '현충일');
+});
+
+test('저장값 병합은 기존 localStorage가 있어도 새 월별 프리셋 레코드를 보존한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 4,
+    offDays: {
+      '2026-05-01': true,
+    },
+    overrides: {
+      '2026-05-01': { isOff: true, comment: '노동절' },
+    },
+  });
+
+  assert.equal(state.offDays['2026-06-13'], true);
+  assert.equal(state.overrides['2026-06-15']?.am, '호빈');
+  assert.equal(state.monthMemo['2026-06']?.includes('1직 평일 협정'), true);
 });

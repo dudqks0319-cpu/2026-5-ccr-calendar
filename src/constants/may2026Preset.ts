@@ -37,6 +37,10 @@ export function applyMay2026PhotoPreset(state: CCRCalendarState): CCRCalendarSta
     selectedYear: 2026,
     selectedMonthIndex: 4,
     startWithNight: false,
+    monthStartWithNight: {
+      ...state.monthStartWithNight,
+      '2026-05': false,
+    },
     selectedCTeamKey: 'A',
     cTeams: {
       ...state.cTeams,
