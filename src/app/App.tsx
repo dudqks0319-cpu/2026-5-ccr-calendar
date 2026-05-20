@@ -9,6 +9,13 @@ import { StatsModal } from '../components/StatsModal.js';
 import { YearCalendar } from '../components/YearCalendar.js';
 import { exportScheduleToExcel } from '../logic/exportExcel.js';
 import { exportElementToPdf } from '../logic/exportPdf.js';
+import {
+  createLocalSaveFile,
+  openLocalSaveFile,
+  supportsLocalFilePersistence,
+  writeStateToFileHandle,
+  type CCRFileHandle,
+} from '../logic/filePersistence.js';
 import { generateMonthSchedule } from '../logic/generateMonthSchedule.js';
 import { saveState, loadState } from '../logic/storage.js';
 import { calculateWorkerStats } from '../logic/stats.js';
@@ -29,6 +36,8 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState<CalendarDay | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [autosaveStatus, setAutosaveStatus] = useState('브라우저 로컬 자동저장 준비');
+  const [fileSaveHandle, setFileSaveHandle] = useState<CCRFileHandle | null>(null);
+  const [fileSaveStatus, setFileSaveStatus] = useState('');
 
   const schedule = useMemo(
     () => generateMonthSchedule(state, state.selectedYear, state.selectedMonthIndex),
@@ -43,11 +52,81 @@ export default function App() {
   useEffect(() => {
     try {
       saveState(state);
-      setAutosaveStatus(`자동저장 완료 · ${new Date(state.updatedAt).toLocaleString('ko-KR')}`);
+      setAutosaveStatus(`브라우저 저장 완료 · ${new Date(state.updatedAt).toLocaleString('ko-KR')}`);
     } catch {
       setAutosaveStatus('자동 저장 실패 · 브라우저 저장 공간을 확인하세요');
     }
+
+    if (!fileSaveHandle) return;
+
+    let cancelled = false;
+    setFileSaveStatus(`파일 저장 중 · ${fileSaveHandle.name}`);
+    writeStateToFileHandle(fileSaveHandle, state)
+      .then(() => {
+        if (!cancelled) {
+          setFileSaveStatus(`파일 저장 완료 · ${fileSaveHandle.name}`);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setFileSaveStatus(
+            error instanceof Error
+              ? `파일 저장 실패 · ${error.message}`
+              : '파일 저장 실패',
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [state]);
+
+  async function handleCreateLocalSaveFile() {
+    try {
+      setFileSaveStatus('로컬 저장 파일 만드는 중');
+      const handle = await createLocalSaveFile(state);
+      setFileSaveHandle(handle);
+      setFileSaveStatus(`파일 저장 연결됨 · ${handle.name}`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setFileSaveStatus('로컬 저장 파일 선택 취소');
+        return;
+      }
+      setFileSaveStatus(error instanceof Error ? error.message : '로컬 저장 파일 생성 실패');
+    }
+  }
+
+  async function handleOpenLocalSaveFile() {
+    try {
+      setFileSaveStatus('로컬 저장 파일 여는 중');
+      const { handle, state: nextState } = await openLocalSaveFile();
+      setFileSaveHandle(handle);
+      applyState(nextState);
+      setFileSaveStatus(`파일 저장 연결됨 · ${handle.name}`);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setFileSaveStatus('로컬 저장 파일 선택 취소');
+        return;
+      }
+      setFileSaveStatus(error instanceof Error ? error.message : '로컬 저장 파일 불러오기 실패');
+    }
+  }
+
+  async function handleSaveLocalFileNow() {
+    if (!fileSaveHandle) {
+      await handleCreateLocalSaveFile();
+      return;
+    }
+
+    try {
+      setFileSaveStatus(`파일 저장 중 · ${fileSaveHandle.name}`);
+      await writeStateToFileHandle(fileSaveHandle, state);
+      setFileSaveStatus(`파일 저장 완료 · ${fileSaveHandle.name}`);
+    } catch (error) {
+      setFileSaveStatus(error instanceof Error ? error.message : '로컬 파일 저장 실패');
+    }
+  }
 
   function previousMonth() {
     const nextMonth = state.selectedMonthIndex - 1;
@@ -97,7 +176,7 @@ export default function App() {
         onExportPdf={handleExportPdf}
         onExportExcel={() => exportScheduleToExcel(schedule)}
         onPrint={() => window.print()}
-        autosaveStatus={autosaveStatus}
+        autosaveStatus={fileSaveStatus ? `${autosaveStatus} · ${fileSaveStatus}` : autosaveStatus}
       />
 
       <CalendarControls
@@ -166,7 +245,17 @@ export default function App() {
       ) : null}
 
       {openModal === 'backup' ? (
-        <BackupPanel state={state} onChange={applyState} onClose={() => setOpenModal(null)} />
+        <BackupPanel
+          state={state}
+          onChange={applyState}
+          onClose={() => setOpenModal(null)}
+          fileSaveName={fileSaveHandle?.name ?? ''}
+          fileSaveStatus={fileSaveStatus}
+          filePersistenceSupported={supportsLocalFilePersistence()}
+          onCreateLocalSaveFile={handleCreateLocalSaveFile}
+          onOpenLocalSaveFile={handleOpenLocalSaveFile}
+          onSaveLocalFileNow={handleSaveLocalFileNow}
+        />
       ) : null}
     </div>
   );
