@@ -1,5 +1,6 @@
 import type { CalendarDay, CCRCalendarState } from '../types/ccr.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
+import { isDateOff } from '../logic/generateMonthSchedule.js';
 import { Button, Field, Input, Modal, Textarea } from './ui.js';
 
 type DayEditModalProps = {
@@ -23,6 +24,12 @@ function setRecordValue<T>(
 export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProps) {
   const allWorkers = buildBaseRotation(state.dayTeams);
   const override = state.overrides[day.dateKey] || {};
+  const isCurrentlyOff = isDateOff(day.dateKey, day.dayOfWeek, state);
+  const isManualOffChange =
+    typeof override.isOff === 'boolean' || typeof state.offDays[day.dateKey] === 'boolean';
+  const isCurrentSaturdayOvertime =
+    day.dayOfWeek === 6 &&
+    (override.isSaturdayOvertime ?? state.saturdayOvertime[day.dateKey]) === true;
 
   function updateOverride(nextOverride: typeof override) {
     const nextOverrides = { ...state.overrides };
@@ -36,6 +43,11 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
   }
 
   function updateOff(isOff: boolean) {
+    const nextOverride = {
+      ...override,
+      isOff,
+    };
+
     onChange({
       ...state,
       offDays: {
@@ -44,10 +56,7 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
       },
       overrides: {
         ...state.overrides,
-        [day.dateKey]: {
-          ...override,
-          isOff,
-        },
+        [day.dateKey]: nextOverride,
       },
     });
   }
@@ -58,17 +67,22 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Button
             type="button"
-            variant={day.isOff ? 'danger' : 'secondary'}
-            onClick={() => updateOff(!day.isOff)}
+            variant={isCurrentlyOff ? 'danger' : 'secondary'}
+            onClick={() => updateOff(!isCurrentlyOff)}
+            aria-pressed={isCurrentlyOff}
           >
-            {day.isOff ? '근무일로 변경' : '휴무일로 변경'}
+            {isCurrentlyOff
+              ? isManualOffChange
+                ? '휴무일로 변경됨 · 다시 누르면 근무일'
+                : '근무일로 변경'
+              : '휴무일로 변경'}
           </Button>
           <Button
             type="button"
-            variant={day.isSaturdayOvertime ? 'primary' : 'secondary'}
+            variant={isCurrentSaturdayOvertime ? 'primary' : 'secondary'}
             disabled={day.dayOfWeek !== 6}
             onClick={() => {
-              const nextValue = !day.isSaturdayOvertime;
+              const nextValue = !isCurrentSaturdayOvertime;
               onChange({
                 ...state,
                 saturdayOvertime: {
@@ -85,7 +99,7 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
               });
             }}
           >
-            특근 {day.isSaturdayOvertime ? 'ON' : 'OFF'}
+            특근 {isCurrentSaturdayOvertime ? 'ON' : 'OFF'}
           </Button>
           <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
             {day.isNight ? '야간 주차' : '주간 주차'}
@@ -93,6 +107,17 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
           <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
             {day.sealerTeam ? `안착불량 ${day.sealerTeam}` : '안착불량 없음'}
           </div>
+        </div>
+
+        <div
+          className={`rounded-md border px-3 py-2 text-sm font-bold ${
+            isCurrentlyOff
+              ? 'border-red-200 bg-red-50 text-red-700'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+          }`}
+        >
+          현재 상태: {isCurrentlyOff ? '휴무일' : '근무일'}
+          {isManualOffChange ? ' · 수동 변경 적용됨' : ''}
         </div>
 
         <datalist id="worker-list">
