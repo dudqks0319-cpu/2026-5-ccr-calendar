@@ -1,0 +1,65 @@
+import type { CCRCalendarState } from '../types/ccr.js';
+
+export const STORAGE_KEY = 'ccr_calendar_v2';
+
+export const DEFAULT_STATE: CCRCalendarState = {
+  version: 2,
+  selectedYear: 2026,
+  selectedMonthIndex: 4,
+  startWithNight: false,
+  selectedCTeamKey: 'A',
+  dayTeams: {
+    conveyor: {
+      label: '컨베어',
+      members: ['호빈', '민성', '동인', '선우', '윤수'],
+    },
+    robot: {
+      label: '로보트',
+      members: ['광수', '영빈', '서용', '찬우', '성광'],
+    },
+    main: {
+      label: '주설비',
+      members: ['우용', '재령', '민혁', '이진', '성운', '승현'],
+    },
+  },
+  cTeams: {
+    A: { label: 'A팀', members: ['민성', '광수', '이진'] },
+    B: { label: 'B팀', members: ['호빈', '찬우', '성운'] },
+    C: { label: 'C팀', members: ['선우', '서용', '우용'] },
+    D: { label: 'D팀', members: ['동인', '영빈', '민혁'] },
+    E: { label: 'E팀', members: ['윤수', '성광', '재령'] },
+  },
+  materialRule: {
+    enabled: true,
+    excludeOnDayShift: true,
+    mode: 'fixed',
+    fixedWorkerName: '',
+    dateWorkers: {},
+    rotationOrder: [],
+  },
+  cTeamExcludeMode: 'nightOnly',
+  offDays: {},
+  overrides: {},
+  comments: {},
+  monthMemo: {},
+  saturdayOvertime: {},
+  sealerRotation: {
+    enabled: true,
+    startDate: '2025-01-05',
+    teams: ['컨베어팀', '로보트팀', '주설비팀'],
+    intervalDays: 14,
+  },
+  ui: {
+    darkMode: false,
+    themeColor: '#003D82',
+    pdfScale: 95,
+    viewMode: 'month',
+  },
+  updatedAt: new Date().toISOString(),
+};
+
+export const WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+export const C_TEAM_KEYS = ['A', 'B', 'C', 'D', 'E'] as const;
+
+export const TEAM_KEYS = ['conveyor', 'robot', 'main'] as const;
