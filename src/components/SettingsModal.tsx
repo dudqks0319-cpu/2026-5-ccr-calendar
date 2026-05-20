@@ -1,7 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { CCRCalendarState, CTeamExcludeMode, CTeamKey, MaterialMode, TeamKey } from '../types/ccr.js';
+import type {
+  CCRCalendarState,
+  CTeamConfig,
+  CTeamDepartments,
+  CTeamExcludeMode,
+  CTeamKey,
+  MaterialMode,
+  TeamKey,
+} from '../types/ccr.js';
 import { C_TEAM_KEYS, DEFAULT_STATE, TEAM_KEYS } from '../constants/defaults.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
+import { getMonthCTeamMembers } from '../logic/generateMonthSchedule.js';
+import { toMonthKey } from '../utils/date.js';
 import { Button, Field, Input, Modal, Select, Textarea } from './ui.js';
 
 type SettingsModalProps = {
@@ -21,6 +31,14 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: 'theme', label: '화면/출력' },
 ];
 
+const C_TEAM_DEPARTMENT_KEYS: TeamKey[] = ['robot', 'main', 'conveyor'];
+const C_TEAM_MEMBER_DISPLAY_ORDER: TeamKey[] = ['conveyor', 'robot', 'main'];
+const C_TEAM_DEPARTMENT_LABELS: Record<TeamKey, string> = {
+  robot: '로보트팀',
+  main: '주설비팀',
+  conveyor: '컨베어팀',
+};
+
 function parseNames(value: string) {
   return value
     .split(/[\n,]/)
@@ -32,9 +50,27 @@ function namesToText(names: string[]) {
   return names.join(', ');
 }
 
+function buildDepartmentsFromMembers(team: CTeamConfig): CTeamDepartments {
+  if (team.departments) return team.departments;
+  const members = team.members.filter(Boolean);
+  return {
+    conveyor: members[0] ? [members[0]] : [],
+    robot: members[1] ? [members[1]] : [],
+    main: members[2] ? [members[2]] : [],
+  };
+}
+
+function flattenCTeamDepartments(departments: CTeamDepartments) {
+  return C_TEAM_MEMBER_DISPLAY_ORDER.flatMap((teamKey) => departments[teamKey] || []).filter(Boolean);
+}
+
 export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('teams');
   const rotationPreview = useMemo(() => buildBaseRotation(state.dayTeams), [state.dayTeams]);
+  const monthKey = toMonthKey(state.selectedYear, state.selectedMonthIndex);
+  const monthCTeamText = namesToText(
+    state.monthCTeams[monthKey] || getMonthCTeamMembers(state, state.selectedYear, state.selectedMonthIndex),
+  );
 
   function updateDayTeam(teamKey: TeamKey, membersText: string) {
     onChange({
@@ -57,6 +93,30 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
         [teamKey]: {
           ...state.cTeams[teamKey],
           members: parseNames(membersText),
+        },
+      },
+    });
+  }
+
+  function updateCTeamDepartment(
+    cTeamKey: CTeamKey,
+    departmentKey: TeamKey,
+    membersText: string,
+  ) {
+    const currentTeam = state.cTeams[cTeamKey];
+    const nextDepartments = {
+      ...buildDepartmentsFromMembers(currentTeam),
+      [departmentKey]: parseNames(membersText),
+    };
+
+    onChange({
+      ...state,
+      cTeams: {
+        ...state.cTeams,
+        [cTeamKey]: {
+          ...currentTeam,
+          departments: nextDepartments,
+          members: flattenCTeamDepartments(nextDepartments),
         },
       },
     });
@@ -107,15 +167,52 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
         ) : null}
 
         {activeTab === 'cteam' ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            {C_TEAM_KEYS.map((teamKey) => (
-              <Field key={teamKey} label={`${state.cTeams[teamKey].label} 멤버`}>
-                <Textarea
-                  value={namesToText(state.cTeams[teamKey].members)}
-                  onChange={(event) => updateCTeam(teamKey, event.target.value)}
-                />
-              </Field>
-            ))}
+          <div className="grid gap-4">
+            <Field label={`${state.selectedYear}년 ${state.selectedMonthIndex + 1}월 C조 표시`}>
+              <Input
+                value={monthCTeamText}
+                onChange={(event) =>
+                  onChange({
+                    ...state,
+                    monthCTeams: {
+                      ...state.monthCTeams,
+                      [monthKey]: parseNames(event.target.value),
+                    },
+                  })
+                }
+              />
+            </Field>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              {C_TEAM_KEYS.map((teamKey) => {
+                const team = state.cTeams[teamKey];
+                const departments = buildDepartmentsFromMembers(team);
+
+                return (
+                  <section key={teamKey} className="grid gap-3 rounded-lg border border-slate-200 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-base font-black text-slate-950">{team.label}</h3>
+                      <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
+                        {namesToText(flattenCTeamDepartments(departments))}
+                      </span>
+                    </div>
+                    {C_TEAM_DEPARTMENT_KEYS.map((departmentKey) => (
+                      <Field
+                        key={`${teamKey}-${departmentKey}`}
+                        label={`${team.label} ${C_TEAM_DEPARTMENT_LABELS[departmentKey]}`}
+                      >
+                        <Input
+                          value={namesToText(departments[departmentKey] || [])}
+                          onChange={(event) =>
+                            updateCTeamDepartment(teamKey, departmentKey, event.target.value)
+                          }
+                        />
+                      </Field>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
           </div>
         ) : null}
 
@@ -219,25 +316,122 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
 
         {activeTab === 'rules' ? (
           <div className="grid gap-4">
-            <Field label="C조 근무자를 전반/후반 순번에서 제외">
-              <Select
-                value={state.cTeamExcludeMode}
-                onChange={(event) =>
-                  onChange({
-                    ...state,
-                    cTeamExcludeMode: event.target.value as CTeamExcludeMode,
-                  })
-                }
-              >
-                <option value="always">항상 제외</option>
-                <option value="nightOnly">야간 주차에만 제외</option>
-                <option value="none">제외하지 않음</option>
-              </Select>
-            </Field>
+            <div className="grid gap-3 md:grid-cols-3">
+              <Field label="C조 근무자를 전반/후반 순번에서 제외">
+                <Select
+                  value={state.cTeamExcludeMode}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      cTeamExcludeMode: event.target.value as CTeamExcludeMode,
+                    })
+                  }
+                >
+                  <option value="always">항상 제외</option>
+                  <option value="nightOnly">야간 주차에만 제외</option>
+                  <option value="none">제외하지 않음</option>
+                </Select>
+              </Field>
+              <Field label="토요일 기본 OFF">
+                <Select
+                  value={state.saturdayDefaultOff ? 'on' : 'off'}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      saturdayDefaultOff: event.target.value === 'on',
+                    })
+                  }
+                >
+                  <option value="on">ON</option>
+                  <option value="off">OFF</option>
+                </Select>
+              </Field>
+              <Field label={`${state.selectedYear}년 ${state.selectedMonthIndex + 1}월 시작 순번`}>
+                <Input
+                  type="number"
+                  min={0}
+                  value={state.monthStartPointer[monthKey] ?? 0}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      monthStartPointer: {
+                        ...state.monthStartPointer,
+                        [monthKey]: Number(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-4">
+              <Field label="2주 팀 라벨">
+                <Select
+                  value={state.twoWeekTeamRotation.enabled ? 'on' : 'off'}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      twoWeekTeamRotation: {
+                        ...state.twoWeekTeamRotation,
+                        enabled: event.target.value === 'on',
+                      },
+                    })
+                  }
+                >
+                  <option value="on">ON</option>
+                  <option value="off">OFF</option>
+                </Select>
+              </Field>
+              <Field label="2주 라벨 기준일">
+                <Input
+                  type="date"
+                  value={state.twoWeekTeamRotation.startDate}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      twoWeekTeamRotation: {
+                        ...state.twoWeekTeamRotation,
+                        startDate: event.target.value,
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label="2주 라벨 간격">
+                <Input
+                  type="number"
+                  min={1}
+                  value={state.twoWeekTeamRotation.intervalDays}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      twoWeekTeamRotation: {
+                        ...state.twoWeekTeamRotation,
+                        intervalDays: Number(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </Field>
+              <Field label="2주 라벨 팀 순서">
+                <Input
+                  value={namesToText(state.twoWeekTeamRotation.teams)}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      twoWeekTeamRotation: {
+                        ...state.twoWeekTeamRotation,
+                        teams: parseNames(event.target.value),
+                      },
+                    })
+                  }
+                />
+              </Field>
+            </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
               <p className="font-bold text-slate-950">현재 순번 규칙</p>
               <p>근무일은 전반/후반을 배정하지만 다음 근무일 시작점은 1칸만 이동합니다.</p>
-              <p>일요일 또는 휴무일은 OFF이며 순번 카운트를 증가시키지 않습니다.</p>
+              <p>일요일, 기본 토요일, 휴무일은 OFF이며 순번 카운트를 증가시키지 않습니다.</p>
               <p>수동 전반/후반 변경일은 근무일로 보며 순번 카운트를 증가시킵니다.</p>
             </div>
           </div>
@@ -374,9 +568,14 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                   ...state,
                   dayTeams: DEFAULT_STATE.dayTeams,
                   cTeams: DEFAULT_STATE.cTeams,
+                  monthCTeams: DEFAULT_STATE.monthCTeams,
+                  monthStartPointer: DEFAULT_STATE.monthStartPointer,
+                  monthStartWithNight: DEFAULT_STATE.monthStartWithNight,
+                  saturdayDefaultOff: DEFAULT_STATE.saturdayDefaultOff,
                   materialRule: DEFAULT_STATE.materialRule,
                   cTeamExcludeMode: DEFAULT_STATE.cTeamExcludeMode,
                   sealerRotation: DEFAULT_STATE.sealerRotation,
+                  twoWeekTeamRotation: DEFAULT_STATE.twoWeekTeamRotation,
                   ui: {
                     ...state.ui,
                     themeColor: DEFAULT_STATE.ui.themeColor,

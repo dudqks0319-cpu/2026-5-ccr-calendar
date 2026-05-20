@@ -1,5 +1,6 @@
 import type { CalendarDay, CCRCalendarState, MonthSchedule } from '../types/ccr.js';
 import { WEEKDAY_LABELS } from '../constants/defaults.js';
+import { getMonthCTeamMembers } from '../logic/generateMonthSchedule.js';
 import { toMonthKey } from '../utils/date.js';
 import { DayCell } from './DayCell.js';
 import { Textarea } from './ui.js';
@@ -22,7 +23,7 @@ export function MonthCalendar({
   const emptyPrefix = Array.from({ length: schedule.firstDayOfMonthWeekday }, (_, index) => index);
   const monthKey = toMonthKey(schedule.year, schedule.monthIndex);
   const monthMemo = state.monthMemo[monthKey] || '';
-  const selectedCTeamNames = state.cTeams[state.selectedCTeamKey]?.members.filter(Boolean) || [];
+  const selectedCTeamNames = getMonthCTeamMembers(state, schedule.year, schedule.monthIndex);
 
   return (
     <section

@@ -31,9 +31,9 @@ export function exportScheduleToExcel(schedule: MonthSchedule) {
     day.pm,
     day.cTeamText,
     day.materialWorker,
-    day.isSaturdayOvertime ? '특근' : '',
+    day.specialWorkLabel || (day.isSaturdayOvertime ? '특근' : ''),
     day.sealerTeam,
-    day.comment,
+    [day.holidayName, day.weekTeamLabel, day.userComment].filter(Boolean).join(' / '),
   ]);
 
   const tableRows = [headers, ...rows]

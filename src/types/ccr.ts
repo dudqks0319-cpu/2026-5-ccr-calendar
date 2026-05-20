@@ -5,11 +5,14 @@ export type TeamConfig = {
   members: string[];
 };
 
+export type CTeamDepartments = Partial<Record<TeamKey, string[]>>;
+
 export type CTeamKey = 'A' | 'B' | 'C' | 'D' | 'E';
 
 export type CTeamConfig = {
   label: string;
   members: string[];
+  departments?: CTeamDepartments;
 };
 
 export type CTeamExcludeMode = 'always' | 'nightOnly' | 'none';
@@ -33,9 +36,20 @@ export type DayOverride = {
   materialWorker?: string;
   isSaturdayOvertime?: boolean;
   comment?: string;
+  holidayName?: string;
+  weekTeamLabel?: string;
+  specialWorkLabel?: string;
+  userComment?: string;
 };
 
 export type SealerRotation = {
+  enabled: boolean;
+  startDate: string;
+  teams: string[];
+  intervalDays: number;
+};
+
+export type TwoWeekTeamRotation = {
   enabled: boolean;
   startDate: string;
   teams: string[];
@@ -57,6 +71,10 @@ export type CalendarDay = {
   isSaturdayOvertime: boolean;
   sealerTeam: string;
   comment: string;
+  holidayName: string;
+  weekTeamLabel: string;
+  specialWorkLabel: string;
+  userComment: string;
 };
 
 export type MonthSchedule = {
@@ -72,17 +90,21 @@ export type CCRCalendarState = {
   selectedMonthIndex: number;
   startWithNight: boolean;
   monthStartWithNight: Record<string, boolean>;
+  monthCTeams: Record<string, string[]>;
+  monthStartPointer: Record<string, number>;
   selectedCTeamKey: CTeamKey;
   dayTeams: Record<TeamKey, TeamConfig>;
   cTeams: Record<CTeamKey, CTeamConfig>;
   materialRule: MaterialRule;
   cTeamExcludeMode: CTeamExcludeMode;
+  saturdayDefaultOff: boolean;
   offDays: Record<string, boolean>;
   overrides: Record<string, DayOverride>;
   comments: Record<string, string>;
   monthMemo: Record<string, string>;
   saturdayOvertime: Record<string, boolean>;
   sealerRotation: SealerRotation;
+  twoWeekTeamRotation: TwoWeekTeamRotation;
   ui: {
     darkMode: boolean;
     themeColor: string;

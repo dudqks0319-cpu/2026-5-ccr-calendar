@@ -8,6 +8,16 @@ export const DEFAULT_STATE: CCRCalendarState = {
   selectedMonthIndex: 4,
   startWithNight: false,
   monthStartWithNight: {},
+  monthCTeams: {
+    '2026-04': ['선우', '영빈', '우용'],
+    '2026-05': ['민성', '서용', '재령'],
+    '2026-06': ['민성', '서용', '재령'],
+  },
+  monthStartPointer: {
+    '2026-04': 13,
+    '2026-05': 10,
+    '2026-06': 6,
+  },
   selectedCTeamKey: 'A',
   dayTeams: {
     conveyor: {
@@ -24,11 +34,51 @@ export const DEFAULT_STATE: CCRCalendarState = {
     },
   },
   cTeams: {
-    A: { label: 'A팀', members: ['민성', '광수', '이진'] },
-    B: { label: 'B팀', members: ['호빈', '찬우', '성운'] },
-    C: { label: 'C팀', members: ['선우', '서용', '우용'] },
-    D: { label: 'D팀', members: ['동인', '영빈', '민혁'] },
-    E: { label: 'E팀', members: ['윤수', '성광', '재령'] },
+    A: {
+      label: 'A팀',
+      members: ['민성', '광수', '이진'],
+      departments: {
+        conveyor: ['민성'],
+        robot: ['광수'],
+        main: ['이진'],
+      },
+    },
+    B: {
+      label: 'B팀',
+      members: ['호빈', '찬우', '성운'],
+      departments: {
+        conveyor: ['호빈'],
+        robot: ['찬우'],
+        main: ['성운'],
+      },
+    },
+    C: {
+      label: 'C팀',
+      members: ['선우', '서용', '우용'],
+      departments: {
+        conveyor: ['선우'],
+        robot: ['서용'],
+        main: ['우용'],
+      },
+    },
+    D: {
+      label: 'D팀',
+      members: ['동인', '영빈', '민혁'],
+      departments: {
+        conveyor: ['동인'],
+        robot: ['영빈'],
+        main: ['민혁'],
+      },
+    },
+    E: {
+      label: 'E팀',
+      members: ['윤수', '성광', '재령'],
+      departments: {
+        conveyor: ['윤수'],
+        robot: ['성광'],
+        main: ['재령'],
+      },
+    },
   },
   materialRule: {
     enabled: true,
@@ -39,6 +89,7 @@ export const DEFAULT_STATE: CCRCalendarState = {
     rotationOrder: [],
   },
   cTeamExcludeMode: 'nightOnly',
+  saturdayDefaultOff: true,
   offDays: {},
   overrides: {},
   comments: {},
@@ -48,6 +99,12 @@ export const DEFAULT_STATE: CCRCalendarState = {
     enabled: true,
     startDate: '2025-01-05',
     teams: ['컨베어팀', '로보트팀', '주설비팀'],
+    intervalDays: 14,
+  },
+  twoWeekTeamRotation: {
+    enabled: true,
+    startDate: '2026-04-06',
+    teams: ['컨베어', '로보트', '주설비'],
     intervalDays: 14,
   },
   ui: {

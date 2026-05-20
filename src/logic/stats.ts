@@ -3,7 +3,7 @@ import type { CCRCalendarState, MonthSchedule, WorkerStats } from '../types/ccr.
 
 function splitNames(text: string) {
   return text
-    .split(',')
+    .split(/[\s,]+/)
     .map((name) => name.trim())
     .filter(Boolean);
 }

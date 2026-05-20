@@ -3,13 +3,26 @@ import test from 'node:test';
 import type { CCRCalendarState } from '../src/types/ccr.js';
 import { DEFAULT_STATE } from '../src/constants/defaults.js';
 import { buildBaseRotation } from '../src/logic/buildBaseRotation.js';
-import { generateMonthSchedule, isNightWeek } from '../src/logic/generateMonthSchedule.js';
+import {
+  generateMonthSchedule,
+  getMonthCTeamMembers,
+  getTwoWeekTeamLabel,
+  isNightWeek,
+} from '../src/logic/generateMonthSchedule.js';
 import { getSealerTeam } from '../src/logic/getSealerTeam.js';
 import { mergeState } from '../src/logic/storage.js';
 
 function stateWith(partial: Partial<CCRCalendarState>): CCRCalendarState {
   return {
     ...structuredClone(DEFAULT_STATE),
+    monthCTeams: {},
+    monthStartPointer: {},
+    monthStartWithNight: {},
+    saturdayDefaultOff: false,
+    twoWeekTeamRotation: {
+      ...DEFAULT_STATE.twoWeekTeamRotation,
+      enabled: false,
+    },
     ...partial,
   };
 }
@@ -98,6 +111,7 @@ test('C조는 야간 주차에만 표시하고 일요일 야간도 조기가동 
     selectedYear: 2026,
     selectedMonthIndex: 4,
     startWithNight: true,
+    monthCTeams: {},
   });
   const schedule = generateMonthSchedule(state, 2026, 4);
   const friday = schedule.days.find((day) => day.dateKey === '2026-05-01');
@@ -116,6 +130,7 @@ test('날짜별 C조 직접 수정은 해당 날짜만 우선한다', () => {
     selectedYear: 2026,
     selectedMonthIndex: 4,
     startWithNight: true,
+    monthCTeams: {},
     overrides: {
       '2026-05-01': {
         cTeamText: '호빈, 우용, 성광',
@@ -156,6 +171,7 @@ test('야간에는 자재담당자 제외가 적용되지 않는다', () => {
     selectedMonthIndex: 4,
     startWithNight: true,
     cTeamExcludeMode: 'none',
+    monthCTeams: {},
     materialRule: {
       ...DEFAULT_STATE.materialRule,
       fixedWorkerName: '광수',
@@ -171,6 +187,7 @@ test('야간 C조 제외 기본값은 선택 C조 멤버를 자동 배정에서 
     selectedMonthIndex: 4,
     startWithNight: true,
     cTeamExcludeMode: 'nightOnly',
+    monthCTeams: {},
   });
   const schedule = generateMonthSchedule(state, 2026, 4);
   assert.deepEqual([schedule.days[0]?.am, schedule.days[0]?.pm], ['호빈', '우용']);
@@ -230,6 +247,96 @@ test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이
   assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-06')?.comment, '현충일');
 });
 
+test('2026년 4월 사진 기준 C조, 토요일 OFF, 2주 팀 라벨, 날짜별 CCR 조합을 검증한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 3,
+  });
+  const schedule = generateMonthSchedule(state, 2026, 3);
+
+  assert.deepEqual(getMonthCTeamMembers(state, 2026, 3), ['선우', '영빈', '우용']);
+  assert.equal(getTwoWeekTeamLabel('2026-04-06', state), '컨베어');
+  assert.equal(getTwoWeekTeamLabel('2026-04-20', state), '로보트');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-04-04')?.isOff, true);
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-04-06')?.weekTeamLabel, '컨베어');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-04-20')?.weekTeamLabel, '로보트');
+
+  const expectedAssignments: Record<string, [string, string]> = {
+    '2026-04-01': ['성광', '재령'],
+    '2026-04-02': ['재령', '호빈'],
+    '2026-04-03': ['호빈', '광수'],
+    '2026-04-06': ['윤수', '성광'],
+    '2026-04-07': ['성광', '승현'],
+    '2026-04-08': ['승현', '호빈'],
+    '2026-04-09': ['호빈', '광수'],
+    '2026-04-10': ['광수', '재령'],
+    '2026-04-13': ['광수', '민혁'],
+    '2026-04-14': ['민혁', '민성'],
+    '2026-04-15': ['민성', '영빈'],
+    '2026-04-16': ['영빈', '이진'],
+    '2026-04-17': ['이진', '동인'],
+    '2026-04-20': ['재령', '민성'],
+    '2026-04-21': ['민성', '서용'],
+    '2026-04-22': ['서용', '민혁'],
+    '2026-04-23': ['민혁', '동인'],
+    '2026-04-24': ['동인', '찬우'],
+    '2026-04-27': ['동인', '서용'],
+    '2026-04-28': ['서용', '승현'],
+    '2026-04-29': ['승현', '선우'],
+    '2026-04-30': ['선우', '찬우'],
+  };
+
+  for (const [dateKey, assignment] of Object.entries(expectedAssignments)) {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    assert.deepEqual([day?.am, day?.pm], assignment);
+  }
+});
+
+test('2026년 5월 사진 기준 월별 C조, 특근, 2주 팀 라벨, 날짜별 CCR 조합을 검증한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 4,
+  });
+  const schedule = generateMonthSchedule(state, 2026, 4);
+
+  assert.deepEqual(getMonthCTeamMembers(state, 2026, 4), ['민성', '서용', '재령']);
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-05-04')?.weekTeamLabel, '주설비');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-05-18')?.weekTeamLabel, '컨베어');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-05-23')?.specialWorkLabel, '생산특근');
+  assert.equal(schedule.days.find((day) => day.dateKey === '2026-05-30')?.specialWorkLabel, '생산특근');
+
+  const expectedAssignments: Record<string, [string, string]> = {
+    '2026-05-04': ['찬우', '이진'],
+    '2026-05-06': ['이진', '윤수'],
+    '2026-05-07': ['윤수', '성광'],
+    '2026-05-08': ['성광', '성운'],
+    '2026-05-11': ['찬우', '우용'],
+    '2026-05-12': ['우용', '윤수'],
+    '2026-05-13': ['윤수', '성광'],
+    '2026-05-14': ['성광', '재령'],
+    '2026-05-15': ['재령', '호빈'],
+    '2026-05-18': ['성운', '호빈'],
+    '2026-05-19': ['호빈', '광수'],
+    '2026-05-20': ['광수', '승현'],
+    '2026-05-21': ['승현', '동인'],
+    '2026-05-22': ['동인', '영빈'],
+    '2026-05-23': ['영빈', '우용'],
+    '2026-05-25': ['호빈', '광수'],
+    '2026-05-26': ['광수', '민혁'],
+    '2026-05-27': ['민혁', '민성'],
+    '2026-05-28': ['민성', '영빈'],
+    '2026-05-29': ['영빈', '이진'],
+    '2026-05-30': ['이진', '동인'],
+  };
+
+  for (const [dateKey, assignment] of Object.entries(expectedAssignments)) {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    assert.deepEqual([day?.am, day?.pm], assignment);
+  }
+});
+
 test('저장값 병합은 기존 localStorage가 있어도 새 월별 프리셋 레코드를 보존한다', () => {
   const state = mergeState({
     version: 2,
@@ -246,4 +353,17 @@ test('저장값 병합은 기존 localStorage가 있어도 새 월별 프리셋 
   assert.equal(state.offDays['2026-06-13'], true);
   assert.equal(state.overrides['2026-06-15']?.am, '호빈');
   assert.equal(state.monthMemo['2026-06']?.includes('1직 평일 협정'), true);
+  assert.deepEqual(
+    mergeState({
+      version: 2,
+      cTeams: {
+        A: { label: 'A팀', members: ['민성', '서용', '재령'] },
+      } as CCRCalendarState['cTeams'],
+    }).cTeams.A.departments,
+    {
+      conveyor: ['민성'],
+      robot: ['서용'],
+      main: ['재령'],
+    },
+  );
 });

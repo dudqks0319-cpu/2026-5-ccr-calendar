@@ -1,12 +1,21 @@
-import { DEFAULT_STATE, STORAGE_KEY } from '../constants/defaults.js';
+import { C_TEAM_KEYS, DEFAULT_STATE, STORAGE_KEY } from '../constants/defaults.js';
+import { applyApril2026PhotoPreset } from '../constants/april2026Preset.js';
 import { applyJune2026PhotoPreset } from '../constants/june2026Preset.js';
 import { applyMay2026PhotoPreset } from '../constants/may2026Preset.js';
 import type { CCRCalendarState } from '../types/ccr.js';
 import { downloadTextFile, toDateKey } from '../utils/date.js';
 
+function cTeamDepartmentsFromMembers(members: string[]) {
+  return {
+    conveyor: members[0] ? [members[0]] : [],
+    robot: members[1] ? [members[1]] : [],
+    main: members[2] ? [members[2]] : [],
+  };
+}
+
 function cloneDefaultState(): CCRCalendarState {
   const state = JSON.parse(JSON.stringify(DEFAULT_STATE)) as CCRCalendarState;
-  return applyJune2026PhotoPreset(applyMay2026PhotoPreset(state));
+  return applyJune2026PhotoPreset(applyMay2026PhotoPreset(applyApril2026PhotoPreset(state)));
 }
 
 export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState {
@@ -20,11 +29,40 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
     },
     cTeams: {
       ...defaults.cTeams,
-      ...parsed.cTeams,
+      ...Object.fromEntries(
+        C_TEAM_KEYS.map((key) => {
+          const parsedTeam = parsed.cTeams?.[key];
+          const defaultTeam = defaults.cTeams[key];
+          const members = parsedTeam?.members ?? defaultTeam.members;
+          const departments = parsedTeam?.departments
+            ? {
+                ...defaultTeam.departments,
+                ...parsedTeam.departments,
+              }
+            : cTeamDepartmentsFromMembers(members);
+          return [
+            key,
+            {
+              ...defaultTeam,
+              ...parsedTeam,
+              members,
+              departments,
+            },
+          ];
+        }),
+      ),
     },
     monthStartWithNight: {
       ...defaults.monthStartWithNight,
       ...parsed.monthStartWithNight,
+    },
+    monthCTeams: {
+      ...defaults.monthCTeams,
+      ...parsed.monthCTeams,
+    },
+    monthStartPointer: {
+      ...defaults.monthStartPointer,
+      ...parsed.monthStartPointer,
     },
     offDays: {
       ...defaults.offDays,
@@ -59,6 +97,10 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
     sealerRotation: {
       ...defaults.sealerRotation,
       ...parsed.sealerRotation,
+    },
+    twoWeekTeamRotation: {
+      ...defaults.twoWeekTeamRotation,
+      ...parsed.twoWeekTeamRotation,
     },
     ui: {
       ...defaults.ui,

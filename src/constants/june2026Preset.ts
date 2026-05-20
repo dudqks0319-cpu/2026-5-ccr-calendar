@@ -3,10 +3,10 @@ import type { CCRCalendarState, DayOverride } from '../types/ccr.js';
 const june2026Overrides: Record<string, DayOverride> = {
   '2026-06-01': { am: '동인', pm: '민혁' },
   '2026-06-02': { am: '민혁', pm: '선우' },
-  '2026-06-03': { isOff: true, comment: '지방선거' },
+  '2026-06-03': { isOff: true, holidayName: '지방선거' },
   '2026-06-04': { am: '선우', pm: '찬우' },
   '2026-06-05': { am: '찬우', pm: '이진' },
-  '2026-06-06': { isOff: true, isSaturdayOvertime: false, comment: '현충일' },
+  '2026-06-06': { isOff: true, isSaturdayOvertime: false, holidayName: '현충일' },
   '2026-06-08': { am: '이진', pm: '윤수' },
   '2026-06-09': { am: '윤수', pm: '성광' },
   '2026-06-10': { am: '성광', pm: '성운' },
@@ -39,12 +39,25 @@ export function applyJune2026PhotoPreset(state: CCRCalendarState): CCRCalendarSt
       ...state.monthStartWithNight,
       '2026-06': true,
     },
+    monthCTeams: {
+      ...state.monthCTeams,
+      '2026-06': ['민성', '서용', '재령'],
+    },
+    monthStartPointer: {
+      ...state.monthStartPointer,
+      '2026-06': 6,
+    },
     selectedCTeamKey: 'A',
     cTeams: {
       ...state.cTeams,
       A: {
         label: 'A팀',
         members: ['민성', '서용', '재령'],
+        departments: {
+          conveyor: ['민성'],
+          robot: ['서용'],
+          main: ['재령'],
+        },
       },
     },
     offDays: {

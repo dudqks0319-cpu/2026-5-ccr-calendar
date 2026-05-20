@@ -8,7 +8,18 @@ type DayCellProps = {
 function includesSearch(day: CalendarDay, searchTerm: string) {
   const term = searchTerm.trim();
   if (!term) return false;
-  return [day.am, day.pm, day.cTeamText, day.materialWorker, day.comment, day.sealerTeam]
+  return [
+    day.am,
+    day.pm,
+    day.cTeamText,
+    day.materialWorker,
+    day.comment,
+    day.holidayName,
+    day.weekTeamLabel,
+    day.specialWorkLabel,
+    day.userComment,
+    day.sealerTeam,
+  ]
     .join(' ')
     .includes(term);
 }
@@ -16,9 +27,7 @@ function includesSearch(day: CalendarDay, searchTerm: string) {
 export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
   const matched = includesSearch(day, searchTerm);
   const displayCTeamText = day.cTeamText.replaceAll(',', '');
-  const isHoliday = ['노동절', '어린이날', '석가탄신일', '지방선거', '현충일'].includes(
-    day.comment,
-  );
+  const topLabel = day.holidayName || day.weekTeamLabel || day.specialWorkLabel || day.userComment;
   const isSaturdayOff = day.dayOfWeek === 6 && day.isOff;
   const isSunday = day.dayOfWeek === 0;
   const shiftBadge = day.isNight ? '야' : '주';
@@ -41,9 +50,9 @@ export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
       <div className="flex min-h-7 items-start justify-between gap-1">
         <div className={`text-xl font-black ${isSunday ? 'text-[#c82032]' : day.dayOfWeek === 6 ? 'text-[#176fc0]' : 'text-slate-950'}`}>
           {day.day}
-          {day.comment ? (
-            <span className={`ml-2 align-middle text-xs font-black ${isHoliday ? 'text-[#c82032]' : 'text-[#123d72]'}`}>
-              {day.comment}
+          {topLabel ? (
+            <span className={`ml-2 align-middle text-xs font-black ${day.holidayName ? 'text-[#c82032]' : 'text-[#123d72]'}`}>
+              {topLabel}
             </span>
           ) : null}
         </div>
@@ -62,7 +71,7 @@ export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
         <div className="grid flex-1 place-items-center text-xl font-black text-[#c82032]">OFF</div>
       ) : null}
 
-      {!isSaturdayOff && !isHoliday && day.cTeamText ? (
+      {!isSaturdayOff && !day.holidayName && day.cTeamText ? (
         <div className="mt-1 text-sm font-black tracking-normal text-purple-900">
           C조 {displayCTeamText}
         </div>
