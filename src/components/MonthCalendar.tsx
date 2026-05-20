@@ -25,6 +25,10 @@ export function MonthCalendar({
   const monthMemo = state.monthMemo[monthKey] || '';
   const selectedCTeamNames = getMonthCTeamMembers(state, schedule.year, schedule.monthIndex);
   const weekRowCount = Math.ceil((emptyPrefix.length + schedule.days.length) / 7);
+  const emptySuffix = Array.from(
+    { length: weekRowCount * 7 - emptyPrefix.length - schedule.days.length },
+    (_, index) => index,
+  );
 
   return (
     <section
@@ -78,6 +82,12 @@ export function MonthCalendar({
         ))}
         {schedule.days.map((day) => (
           <DayCell key={day.dateKey} day={day} searchTerm={searchTerm} onClick={onDayClick} />
+        ))}
+        {emptySuffix.map((index) => (
+          <div
+            key={`suffix-empty-${index}`}
+            className="calendar-empty-day min-h-[126px] border-r border-t border-slate-200 bg-white"
+          />
         ))}
       </div>
 

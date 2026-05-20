@@ -95,7 +95,7 @@ textarea {
 
   #print-area.print-5weeks .calendar-empty-day,
   #print-area.print-5weeks .calendar-day {
-    min-height: 23mm !important;
+    min-height: 24mm !important;
   }
 
   .calendar-day {
@@ -138,6 +138,15 @@ textarea {
     min-height: 30mm !important;
     font-size: 9pt !important;
     line-height: 1.7 !important;
+  }
+
+  #print-area.print-5weeks .print-month-memo {
+    min-height: 15mm !important;
+  }
+
+  #print-area.print-5weeks > div:last-child {
+    margin-top: 2mm !important;
+    padding: 2.5mm !important;
   }
 
   #print-area > div:last-child {
