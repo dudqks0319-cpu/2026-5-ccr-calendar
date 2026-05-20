@@ -24,11 +24,12 @@ export function MonthCalendar({
   const monthKey = toMonthKey(schedule.year, schedule.monthIndex);
   const monthMemo = state.monthMemo[monthKey] || '';
   const selectedCTeamNames = getMonthCTeamMembers(state, schedule.year, schedule.monthIndex);
+  const weekRowCount = Math.ceil((emptyPrefix.length + schedule.days.length) / 7);
 
   return (
     <section
       id="print-area"
-      className="mx-auto min-w-[1180px] max-w-[1480px] bg-white px-8 py-7 text-slate-950 shadow-sm"
+      className={`print-${weekRowCount}weeks mx-auto min-w-[1180px] max-w-[1480px] bg-white px-8 py-7 text-slate-950 shadow-sm`}
     >
       <div className="mb-7 border-b-[3px] border-[#0b376b] pb-3 text-center">
         <h2 className="text-3xl font-black tracking-normal text-[#0b376b]">

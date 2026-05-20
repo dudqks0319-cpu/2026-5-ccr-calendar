@@ -93,6 +93,11 @@ textarea {
     min-height: 22mm !important;
   }
 
+  #print-area.print-5weeks .calendar-empty-day,
+  #print-area.print-5weeks .calendar-day {
+    min-height: 23mm !important;
+  }
+
   .calendar-day {
     break-inside: avoid;
     padding: 1.5mm !important;
