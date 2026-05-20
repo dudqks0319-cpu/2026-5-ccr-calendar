@@ -63,6 +63,7 @@ export type CalendarDay = {
   day: number;
   dayOfWeek: number;
   isOff: boolean;
+  isManualOff: boolean;
   isNight: boolean;
   am: string;
   pm: string;

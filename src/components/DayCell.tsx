@@ -27,9 +27,11 @@ function includesSearch(day: CalendarDay, searchTerm: string) {
 export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
   const matched = includesSearch(day, searchTerm);
   const displayCTeamText = day.cTeamText.replaceAll(',', '');
-  const topLabel = day.holidayName || day.weekTeamLabel || day.specialWorkLabel || day.userComment;
+  const topLabel = day.holidayName || day.weekTeamLabel || day.specialWorkLabel;
+  const userMemo = day.userComment.trim();
   const isSaturdayOff = day.dayOfWeek === 6 && day.isOff;
   const isSunday = day.dayOfWeek === 0;
+  const shouldShowOffLabel = day.isManualOff && !isSaturdayOff && !day.holidayName;
   const shiftBadge = day.isNight ? '야' : '주';
   const bgClass = isSunday
     ? 'bg-[#ffd6dd]'
@@ -71,6 +73,10 @@ export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
         <div className="grid flex-1 place-items-center text-xl font-black text-[#c82032]">OFF</div>
       ) : null}
 
+      {shouldShowOffLabel ? (
+        <div className="mt-1 text-sm font-black leading-tight text-[#c82032]">휴무</div>
+      ) : null}
+
       {!isSaturdayOff && !day.holidayName && day.cTeamText ? (
         <div className="mt-1 text-sm font-black tracking-normal text-purple-900">
           C조 {displayCTeamText}
@@ -80,6 +86,16 @@ export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
       {!day.isOff && day.am && day.pm ? (
         <div className="mt-2 rounded-md bg-slate-400/20 px-2 py-1 text-base font-black leading-tight text-slate-950">
           CCR {day.am} {day.pm}
+        </div>
+      ) : null}
+
+      {userMemo ? (
+        <div
+          className={`mt-1 whitespace-pre-line break-words text-xs font-black leading-snug ${
+            day.isOff ? 'text-[#c82032]' : 'text-[#123d72]'
+          }`}
+        >
+          {userMemo}
         </div>
       ) : null}
     </button>

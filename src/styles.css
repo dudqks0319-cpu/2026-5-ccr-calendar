@@ -88,6 +88,11 @@ textarea {
     min-width: 0 !important;
   }
 
+  #print-area .calendar-empty-day,
+  #print-area .calendar-day {
+    border-color: #cfd8e3 !important;
+  }
+
   .calendar-empty-day,
   .calendar-day {
     min-height: 22mm !important;

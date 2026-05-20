@@ -200,6 +200,7 @@ export function generateMonthSchedule(
       dayOfWeek === 6 &&
       (override?.isSaturdayOvertime ?? state.saturdayOvertime[dateKey]) === true;
     const isOff = isDateOff(dateKey, dayOfWeek, state);
+    const isManualOff = override?.isOff === true || state.offDays[dateKey] === true;
     const materialWorker =
       override?.materialWorker || state.materialRule.dateWorkers[dateKey] || getMaterialWorker(dateKey, state);
     const sealerTeam = getSealerTeam(dateKey, state.sealerRotation);
@@ -212,6 +213,7 @@ export function generateMonthSchedule(
         day,
         dayOfWeek,
         isOff: true,
+        isManualOff,
         isNight,
         am: 'OFF',
         pm: 'OFF',
@@ -249,6 +251,7 @@ export function generateMonthSchedule(
       day,
       dayOfWeek,
       isOff: false,
+      isManualOff: false,
       isNight,
       am,
       pm,
