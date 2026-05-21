@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
-const tscBin = join(repoRoot, 'node_modules', '.bin', process.platform === 'win32' ? 'tsc.cmd' : 'tsc');
+const tscBin = join(repoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
 const testFile = join(repoRoot, '.tmp', 'test-build', 'test', 'logic.test.js');
 const sequencePattern = [
   '기본 순번',
@@ -23,12 +23,17 @@ function run(command, args) {
     stdio: 'inherit',
   });
 
+  if (result.error) {
+    console.error(result.error);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
     process.exit(result.status ?? 1);
   }
 }
 
 console.log('CCR 순번 검증 시작');
-run(tscBin, ['-p', 'tsconfig.test.json']);
+run(process.execPath, [tscBin, '-p', 'tsconfig.test.json']);
 run(process.execPath, ['--test', '--test-name-pattern', sequencePattern, testFile]);
 console.log('CCR 순번 검증 통과');
