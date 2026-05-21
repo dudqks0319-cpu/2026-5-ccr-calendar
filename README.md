@@ -16,7 +16,9 @@
 - 월 메모, 검색, 통계
 - PDF, Excel 호환 파일, 인쇄
 - 브라우저 localStorage 자동저장
+- 로컬 JSON 파일 저장 모드
 - JSON 백업 내보내기/불러오기
+- Windows Electron 앱 패키징
 
 ## 실행
 
@@ -36,6 +38,44 @@ npm audit
 ```
 
 `dist/index.html`은 정적 파일 경로가 상대 경로로 생성되도록 설정되어 있어, 빌드 후 정적 호스팅이나 파일 실행에 사용할 수 있습니다.
+
+## 단일 HTML
+
+```bash
+npm run build:single
+```
+
+생성 파일:
+
+```text
+CCR캘린더_단일파일.html
+```
+
+이 파일 하나만 다른 PC로 전달해도 실행할 수 있습니다. 다만 브라우저 캐시나 localStorage가 자동 삭제되는 PC에서는 `백업/복원` 화면의 `로컬 파일 자동저장`에서 JSON 저장 파일을 연결하세요.
+
+## Windows 앱 빌드
+
+Windows 실행 파일은 GitHub Actions에서 만드는 방식을 권장합니다.
+
+1. GitHub 저장소의 `Actions` 탭으로 이동
+2. `Build Windows Electron App` 선택
+3. `Run workflow` 실행
+4. 완료 후 `CCR-Calendar-Windows-Portable` artifact 다운로드
+5. 압축을 풀고 `CCR-Calendar-Windows-Portable-0.1.0.exe` 실행
+
+로컬에서 Electron 앱을 확인할 때:
+
+```bash
+npm run electron:start
+```
+
+Windows portable exe 빌드 명령:
+
+```bash
+npm run electron:dist:win
+```
+
+macOS에서 Windows exe를 직접 빌드하려면 Electron 런타임 다운로드와 Windows 패키징 환경이 필요하므로, 실제 배포 파일은 GitHub Actions의 Windows runner에서 만드는 것이 가장 안정적입니다.
 
 ## 기본 데이터
 
