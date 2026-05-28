@@ -17,6 +17,15 @@ export type CTeamConfig = {
 
 export type CTeamExcludeMode = 'always' | 'nightOnly' | 'none';
 
+export type ShiftStartType = 'day' | 'night';
+
+export type MonthStartAnchor = {
+  dateKey: string;
+  shift: ShiftStartType;
+  am: string;
+  pm: string;
+};
+
 export type MaterialMode = 'fixed' | 'date' | 'rotation';
 
 export type MaterialRule = {
@@ -93,6 +102,7 @@ export type CCRCalendarState = {
   monthStartWithNight: Record<string, boolean>;
   monthCTeams: Record<string, string[]>;
   monthStartPointer: Record<string, number>;
+  monthStartAnchors: Record<string, Partial<Record<ShiftStartType, MonthStartAnchor>>>;
   selectedCTeamKey: CTeamKey;
   dayTeams: Record<TeamKey, TeamConfig>;
   cTeams: Record<CTeamKey, CTeamConfig>;

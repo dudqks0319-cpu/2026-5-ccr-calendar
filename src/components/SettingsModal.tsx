@@ -6,12 +6,18 @@ import type {
   CTeamExcludeMode,
   CTeamKey,
   MaterialMode,
+  MonthStartAnchor,
+  ShiftStartType,
   TeamKey,
 } from '../types/ccr.js';
 import { C_TEAM_KEYS, DEFAULT_STATE, TEAM_KEYS } from '../constants/defaults.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
-import { getMonthCTeamMembers } from '../logic/generateMonthSchedule.js';
-import { toMonthKey } from '../utils/date.js';
+import {
+  findMonthStartPointerForAnchors,
+  generateMonthSchedule,
+  getMonthCTeamMembers,
+} from '../logic/generateMonthSchedule.js';
+import { toDateKey, toMonthKey } from '../utils/date.js';
 import { Button, Field, Input, Modal, Select, Textarea } from './ui.js';
 
 type SettingsModalProps = {
@@ -37,6 +43,10 @@ const C_TEAM_DEPARTMENT_LABELS: Record<TeamKey, string> = {
   robot: '로보트팀',
   main: '주설비팀',
   conveyor: '컨베어팀',
+};
+const SHIFT_START_LABELS: Record<ShiftStartType, string> = {
+  day: '주간',
+  night: '야간',
 };
 
 function parseNames(value: string) {
@@ -67,6 +77,10 @@ function flattenCTeamDepartments(departments: CTeamDepartments) {
 export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('teams');
   const rotationPreview = useMemo(() => buildBaseRotation(state.dayTeams), [state.dayTeams]);
+  const currentSchedule = useMemo(
+    () => generateMonthSchedule(state, state.selectedYear, state.selectedMonthIndex),
+    [state],
+  );
   const monthKey = toMonthKey(state.selectedYear, state.selectedMonthIndex);
   const monthCTeamText = namesToText(
     state.monthCTeams[monthKey] || getMonthCTeamMembers(state, state.selectedYear, state.selectedMonthIndex),
@@ -119,6 +133,71 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
           departments: nextDepartments,
           members: flattenCTeamDepartments(nextDepartments),
         },
+      },
+    });
+  }
+
+  function getStartAnchor(shift: ShiftStartType): MonthStartAnchor {
+    const savedAnchor = state.monthStartAnchors[monthKey]?.[shift];
+    if (savedAnchor) return savedAnchor;
+
+    const firstMatchingWorkDay = currentSchedule.days.find(
+      (day) => !day.isOff && (shift === 'night' ? day.isNight : !day.isNight),
+    );
+
+    return {
+      dateKey: firstMatchingWorkDay?.dateKey || toDateKey(state.selectedYear, state.selectedMonthIndex, 1),
+      shift,
+      am: firstMatchingWorkDay?.am || rotationPreview[0] || '',
+      pm: firstMatchingWorkDay?.pm || rotationPreview[1] || '',
+    };
+  }
+
+  function updateStartAnchor(shift: ShiftStartType, patch: Partial<MonthStartAnchor>) {
+    const nextAnchor = {
+      ...getStartAnchor(shift),
+      ...patch,
+      shift,
+    };
+
+    onChange({
+      ...state,
+      monthStartAnchors: {
+        ...state.monthStartAnchors,
+        [monthKey]: {
+          ...state.monthStartAnchors[monthKey],
+          [shift]: nextAnchor,
+        },
+      },
+    });
+  }
+
+  function applyStartAnchor(anchor: MonthStartAnchor) {
+    const nextAnchors = {
+      ...state.monthStartAnchors[monthKey],
+      [anchor.shift]: anchor,
+    };
+    const pointer = findMonthStartPointerForAnchors(
+      state,
+      state.selectedYear,
+      state.selectedMonthIndex,
+      Object.values(nextAnchors).filter(Boolean) as MonthStartAnchor[],
+    );
+
+    if (pointer === null) {
+      alert('현재 휴무/C조 제외/자재 제외 규칙을 동시에 만족하는 시작 순번을 찾지 못했습니다. 기준일과 전반/후반 근무자를 다시 확인해주세요.');
+      return;
+    }
+
+    onChange({
+      ...state,
+      monthStartAnchors: {
+        ...state.monthStartAnchors,
+        [monthKey]: nextAnchors,
+      },
+      monthStartPointer: {
+        ...state.monthStartPointer,
+        [monthKey]: pointer,
       },
     });
   }
@@ -360,7 +439,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                   <option value="off">OFF</option>
                 </Select>
               </Field>
-              <Field label={`${state.selectedYear}년 ${state.selectedMonthIndex + 1}월 시작 순번`}>
+              <Field label="계산된 월 시작 순번">
                 <Input
                   type="number"
                   min={0}
@@ -377,6 +456,74 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                 />
               </Field>
             </div>
+
+            <section className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-950">첫 시작 CCR 지정</h3>
+                  <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                    원하는 날짜의 전반/후반을 기준으로 잡으면, 현재 월 시작 순번을 역산해서 반영합니다.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-blue-800">
+                  C조 제외/자재 제외 포함 계산
+                </span>
+              </div>
+
+              <div className="grid gap-3">
+                {(['day', 'night'] as ShiftStartType[]).map((shift) => {
+                  const anchor = getStartAnchor(shift);
+                  return (
+                    <div
+                      key={shift}
+                      className="grid gap-3 rounded-lg border border-blue-100 bg-white p-3 lg:grid-cols-[120px_1fr_1fr_1fr_auto]"
+                    >
+                      <div className="flex items-center text-sm font-black text-slate-950">
+                        {SHIFT_START_LABELS[shift]} 시작
+                      </div>
+                      <Field label="기준 날짜" className="min-w-0">
+                        <Input
+                          type="date"
+                          value={anchor.dateKey}
+                          onChange={(event) => updateStartAnchor(shift, { dateKey: event.target.value })}
+                        />
+                      </Field>
+                      <Field label="전반 근무자" className="min-w-0">
+                        <Select
+                          value={anchor.am}
+                          onChange={(event) => updateStartAnchor(shift, { am: event.target.value })}
+                        >
+                          <option value="">선택</option>
+                          {rotationPreview.map((workerName) => (
+                            <option key={`${shift}-am-${workerName}`} value={workerName}>
+                              {workerName}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <Field label="후반 근무자" className="min-w-0">
+                        <Select
+                          value={anchor.pm}
+                          onChange={(event) => updateStartAnchor(shift, { pm: event.target.value })}
+                        >
+                          <option value="">선택</option>
+                          {rotationPreview.map((workerName) => (
+                            <option key={`${shift}-pm-${workerName}`} value={workerName}>
+                              {workerName}
+                            </option>
+                          ))}
+                        </Select>
+                      </Field>
+                      <div className="flex items-end">
+                        <Button type="button" onClick={() => applyStartAnchor(anchor)} className="w-full">
+                          기준 적용
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
 
             <div className="grid gap-3 md:grid-cols-4">
               <Field label="2주 팀 라벨">
@@ -447,6 +594,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
               <p>근무일은 전반/후반을 배정하지만 다음 근무일 시작점은 1칸만 이동합니다.</p>
               <p>일요일, 기본 토요일, 휴무일은 OFF이며 순번 카운트를 증가시키지 않습니다.</p>
               <p>수동 전반/후반 변경일은 근무일로 보며 순번 카운트를 증가시킵니다.</p>
+              <p>야간 주차는 표시되는 C조 3명을 전반/후반 후보에서 제외하고 다음 순번자를 배정합니다.</p>
             </div>
           </div>
         ) : null}
@@ -585,6 +733,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                   cTeams: DEFAULT_STATE.cTeams,
                   monthCTeams: DEFAULT_STATE.monthCTeams,
                   monthStartPointer: DEFAULT_STATE.monthStartPointer,
+                  monthStartAnchors: DEFAULT_STATE.monthStartAnchors,
                   monthStartWithNight: DEFAULT_STATE.monthStartWithNight,
                   saturdayDefaultOff: DEFAULT_STATE.saturdayDefaultOff,
                   materialRule: DEFAULT_STATE.materialRule,

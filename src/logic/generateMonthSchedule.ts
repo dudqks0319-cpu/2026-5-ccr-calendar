@@ -3,6 +3,7 @@ import type {
   CalendarDay,
   CTeamExcludeMode,
   MaterialRule,
+  MonthStartAnchor,
   MonthSchedule,
 } from '../types/ccr.js';
 import { getDaysInMonth, toDateKey, toMonthKey } from '../utils/date.js';
@@ -97,6 +98,13 @@ export function getCTeamText(dateKey: string, state: CCRCalendarState) {
   return selectedCTeam?.members.filter(Boolean).join(', ') || '';
 }
 
+function parseCTeamText(value: string) {
+  return value
+    .split(/[,\s]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function getMonthCTeamMembers(
   state: CCRCalendarState,
   year: number,
@@ -105,6 +113,17 @@ export function getMonthCTeamMembers(
   const monthMembers = state.monthCTeams[toMonthKey(year, monthIndex)];
   if (monthMembers?.length) return monthMembers.filter(Boolean);
   return state.cTeams[state.selectedCTeamKey]?.members.filter(Boolean) || [];
+}
+
+export function getDateCTeamMembers(
+  dateKey: string,
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+) {
+  const overrideText = state.overrides[dateKey]?.cTeamText;
+  if (overrideText) return parseCTeamText(overrideText);
+  return getMonthCTeamMembers(state, year, monthIndex);
 }
 
 export function isDateOff(dateKey: string, dayOfWeek: number, state: CCRCalendarState) {
@@ -184,7 +203,6 @@ export function generateMonthSchedule(
   const daysInMonth = getDaysInMonth(year, monthIndex);
   const firstDayOfMonthWeekday = new Date(year, monthIndex, 1).getDay();
   const baseRotation = buildBaseRotation(state.dayTeams);
-  const selectedCTeamMembers = getMonthCTeamMembers(state, year, monthIndex);
   const startWithNight = getMonthStartWithNight(state, year, monthIndex);
   const monthKey = toMonthKey(year, monthIndex);
   const days: CalendarDay[] = [];
@@ -206,6 +224,7 @@ export function generateMonthSchedule(
     const sealerTeam = getSealerTeam(dateKey, state.sealerRotation);
     const labels = getDayLabels(dateKey, dayOfWeek, isNight, isSaturdayOvertime, state);
     const cTeamText = isNight ? getCTeamText(dateKey, state) : '';
+    const selectedCTeamMembers = getDateCTeamMembers(dateKey, state, year, monthIndex);
 
     if (isOff) {
       days.push({
@@ -275,4 +294,45 @@ export function generateMonthSchedule(
     firstDayOfMonthWeekday,
     days,
   };
+}
+
+export function findMonthStartPointerForAnchors(
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+  anchors: MonthStartAnchor[],
+) {
+  const baseRotation = buildBaseRotation(state.dayTeams);
+  const validAnchors = anchors.filter((anchor) => anchor.dateKey && anchor.am && anchor.pm);
+  if (baseRotation.length === 0 || validAnchors.length === 0) return null;
+
+  const monthKey = toMonthKey(year, monthIndex);
+  const scrubbedOverrides = { ...state.overrides };
+  for (const anchor of validAnchors) {
+    const { am: _am, pm: _pm, ...rest } = scrubbedOverrides[anchor.dateKey] || {};
+    scrubbedOverrides[anchor.dateKey] = rest;
+  }
+
+  for (let pointer = 0; pointer < baseRotation.length; pointer += 1) {
+    const candidateState: CCRCalendarState = {
+      ...state,
+      overrides: scrubbedOverrides,
+      monthStartPointer: {
+        ...state.monthStartPointer,
+        [monthKey]: pointer,
+      },
+    };
+    const schedule = generateMonthSchedule(candidateState, year, monthIndex);
+    const satisfiesAll = validAnchors.every((anchor) => {
+      const day = schedule.days.find((item) => item.dateKey === anchor.dateKey);
+      if (!day || day.isOff) return false;
+      if (anchor.shift === 'night' && !day.isNight) return false;
+      if (anchor.shift === 'day' && day.isNight) return false;
+      return day.am === anchor.am && day.pm === anchor.pm;
+    });
+
+    if (satisfiesAll) return pointer;
+  }
+
+  return null;
 }

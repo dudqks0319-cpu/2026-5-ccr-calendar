@@ -64,6 +64,10 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
       ...defaults.monthStartPointer,
       ...parsed.monthStartPointer,
     },
+    monthStartAnchors: {
+      ...defaults.monthStartAnchors,
+      ...parsed.monthStartAnchors,
+    },
     offDays: {
       ...defaults.offDays,
       ...parsed.offDays,

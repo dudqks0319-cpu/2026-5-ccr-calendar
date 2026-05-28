@@ -4,7 +4,9 @@ import type { CCRCalendarState } from '../src/types/ccr.js';
 import { DEFAULT_STATE } from '../src/constants/defaults.js';
 import { buildBaseRotation } from '../src/logic/buildBaseRotation.js';
 import {
+  findMonthStartPointerForAnchors,
   generateMonthSchedule,
+  getDateCTeamMembers,
   getMonthCTeamMembers,
   getTwoWeekTeamLabel,
   isDateOff,
@@ -143,6 +145,25 @@ test('날짜별 C조 직접 수정은 해당 날짜만 우선한다', () => {
   assert.equal(schedule.days[1]?.cTeamText, '민성, 광수, 이진');
 });
 
+test('야간 날짜별 C조 직접 입력 멤버도 전반/후반 후보에서 제외한다', () => {
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 4,
+    startWithNight: true,
+    cTeamExcludeMode: 'nightOnly',
+    monthCTeams: {},
+    overrides: {
+      '2026-05-01': {
+        cTeamText: '호빈, 광수, 우용',
+      },
+    },
+  });
+  const schedule = generateMonthSchedule(state, 2026, 4);
+  const target = schedule.days.find((day) => day.dateKey === '2026-05-01');
+  assert.deepEqual(getDateCTeamMembers('2026-05-01', state, 2026, 4), ['호빈', '광수', '우용']);
+  assert.deepEqual([target?.am, target?.pm], ['민성', '영빈']);
+});
+
 test('주간 자재담당자는 전반/후반 후보에서 제외하되 순번 흐름은 유지한다', () => {
   const state = stateWith({
     selectedYear: 2026,
@@ -208,6 +229,35 @@ test('주간/야간 주차는 첫 주 시작 설정에 따라 반전된다', () 
   assert.equal(isNightWeek(4, 5, false), true);
   assert.equal(isNightWeek(1, 5, true), true);
   assert.equal(isNightWeek(4, 5, true), false);
+});
+
+test('주간/야간 시작 기준 지정은 월 시작 순번을 역산해서 해당 날짜 전반/후반을 맞춘다', () => {
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+    cTeamExcludeMode: 'none',
+  });
+  const anchor = {
+    dateKey: '2026-06-04',
+    shift: 'day' as const,
+    am: '선우',
+    pm: '찬우',
+  };
+  const pointer = findMonthStartPointerForAnchors(state, 2026, 5, [anchor]);
+  assert.notEqual(pointer, null);
+
+  const schedule = generateMonthSchedule(
+    {
+      ...state,
+      monthStartPointer: {
+        '2026-06': pointer ?? 0,
+      },
+    },
+    2026,
+    5,
+  );
+  const target = schedule.days.find((day) => day.dateKey === anchor.dateKey);
+  assert.deepEqual([target?.am, target?.pm], [anchor.am, anchor.pm]);
 });
 
 test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이어지고 토요일 특근이 없다', () => {
