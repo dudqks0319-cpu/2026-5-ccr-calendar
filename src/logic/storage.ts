@@ -88,6 +88,10 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
       ...defaults.saturdayOvertime,
       ...parsed.saturdayOvertime,
     },
+    serverSave: {
+      ...defaults.serverSave,
+      ...parsed.serverSave,
+    },
     materialRule: {
       ...defaults.materialRule,
       ...parsed.materialRule,

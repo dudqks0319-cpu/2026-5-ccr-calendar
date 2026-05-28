@@ -16,6 +16,7 @@
 - 월 메모, 검색, 통계
 - PDF, Excel 호환 파일, 인쇄
 - 브라우저 localStorage 자동저장
+- Vercel + Neon Postgres 저장키 기반 서버 저장
 - 로컬 JSON 파일 저장 모드
 - JSON 백업 내보내기/불러오기
 - Windows Electron 앱 패키징
@@ -38,6 +39,41 @@ npm audit
 ```
 
 `dist/index.html`은 정적 파일 경로가 상대 경로로 생성되도록 설정되어 있어, 빌드 후 정적 호스팅이나 파일 실행에 사용할 수 있습니다.
+
+## Vercel + Neon 서버 저장
+
+로그인 없이 저장키로 서버에 수동 저장하는 MVP 기능입니다. 기존 localStorage 자동저장과 JSON 백업은 그대로 유지됩니다.
+
+필요 환경변수:
+
+```bash
+DATABASE_URL=
+SERVER_SAVE_MAX_BYTES=500000
+```
+
+Neon SQL Editor에서 `database/schema.sql`을 실행하거나, 첫 API 요청 시 서버 함수가 아래 테이블을 자동 생성합니다.
+
+```sql
+CREATE TABLE IF NOT EXISTS ccr_calendar_saves (
+  save_key text PRIMARY KEY,
+  pin_hash text NULL,
+  state_json jsonb NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+API:
+
+- `POST /api/saves/create`
+- `GET /api/saves/:saveKey?pin=optional`
+- `PUT /api/saves/:saveKey`
+
+주의:
+
+- `DATABASE_URL`은 Vercel 환경변수에만 넣고 클라이언트 코드에는 넣지 않습니다.
+- PIN은 선택 기능이며 원문을 저장하지 않고 Node `scrypt` 해시로 저장합니다.
+- 저장키를 잃어버리면 복구할 수 없으므로 JSON 백업도 함께 보관하세요.
 
 ## 단일 HTML
 

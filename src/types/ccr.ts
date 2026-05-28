@@ -114,6 +114,10 @@ export type CCRCalendarState = {
   comments: Record<string, string>;
   monthMemo: Record<string, string>;
   saturdayOvertime: Record<string, boolean>;
+  serverSave: {
+    saveKey: string;
+    updatedAt: string;
+  };
   sealerRotation: SealerRotation;
   twoWeekTeamRotation: TwoWeekTeamRotation;
   ui: {

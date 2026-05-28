@@ -96,6 +96,10 @@ export const DEFAULT_STATE: CCRCalendarState = {
   comments: {},
   monthMemo: {},
   saturdayOvertime: {},
+  serverSave: {
+    saveKey: '',
+    updatedAt: '',
+  },
   sealerRotation: {
     enabled: true,
     startDate: '2025-01-05',
