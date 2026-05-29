@@ -204,17 +204,17 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
 
   return (
     <Modal title="설정" onClose={onClose} width="max-w-6xl">
-      <div className="grid gap-5 lg:grid-cols-[190px_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-5">
         <aside className="no-print rounded-lg border border-slate-200 bg-slate-50 p-2">
           <div className="px-2 pb-2 text-xs font-black text-slate-500">설정 항목</div>
-          <div className="grid gap-1">
+          <div className="flex gap-1 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
           {tabs.map((tab) => (
             <Button
               key={tab.key}
               type="button"
               variant={activeTab === tab.key ? 'primary' : 'secondary'}
               onClick={() => setActiveTab(tab.key)}
-              className="w-full justify-start"
+              className="shrink-0 justify-start whitespace-nowrap lg:w-full"
             >
               {tab.label}
             </Button>
@@ -223,7 +223,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
         </aside>
 
         <div className="grid min-w-0 gap-4">
-          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-4">
+          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
             <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-3">
               <h3 className="text-lg font-black text-slate-950">{activeTabLabel}</h3>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
@@ -243,7 +243,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                 </Field>
               ))}
             </div>
-            <aside className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <aside className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
               <h3 className="mb-3 text-base font-black text-slate-950">순번표 미리보기</h3>
               <ol className="grid gap-1">
                 {rotationPreview.map((workerName, index) => (
@@ -282,7 +282,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                 const departments = buildDepartmentsFromMembers(team);
 
                 return (
-                  <section key={teamKey} className="grid gap-3 rounded-lg border border-slate-200 p-4">
+                  <section key={teamKey} className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:p-4">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-base font-black text-slate-950">{team.label}</h3>
                       <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">

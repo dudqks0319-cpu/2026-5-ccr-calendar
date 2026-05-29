@@ -17,7 +17,7 @@ export function Button({
 
   return (
     <button
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${variants[variant]} ${className}`}
       {...props}
     >
       {children}
@@ -45,7 +45,7 @@ export function Field({
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`min-h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#003D82] focus:ring-2 focus:ring-[#003D82]/15 ${className}`}
+      className={`min-h-11 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#003D82] focus:ring-2 focus:ring-[#003D82]/15 ${className}`}
       {...props}
     />
   );
@@ -54,7 +54,7 @@ export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInpu
 export function Select({ className = '', children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={`min-h-10 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#003D82] focus:ring-2 focus:ring-[#003D82]/15 ${className}`}
+      className={`min-h-11 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-[#003D82] focus:ring-2 focus:ring-[#003D82]/15 ${className}`}
       {...props}
     >
       {children}
@@ -83,15 +83,15 @@ export function Modal({
   width?: string;
 }) {
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-3">
-      <div className={`max-h-[92vh] w-full overflow-hidden rounded-lg bg-white shadow-2xl ${width}`}>
+    <div className="fixed inset-0 z-50 grid items-end bg-slate-950/45 p-0 sm:place-items-center sm:p-3">
+      <div className={`max-h-[94vh] w-full overflow-hidden rounded-t-xl bg-white shadow-2xl sm:max-h-[92vh] sm:rounded-lg ${width}`}>
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
           <h2 className="text-lg font-bold text-slate-950">{title}</h2>
           <Button type="button" variant="ghost" onClick={onClose} aria-label="닫기">
             닫기
           </Button>
         </div>
-        <div className="max-h-[calc(92vh-72px)] overflow-auto p-5">{children}</div>
+        <div className="max-h-[calc(94vh-72px)] overflow-auto p-4 sm:max-h-[calc(92vh-72px)] sm:p-5">{children}</div>
       </div>
     </div>
   );

@@ -28,6 +28,39 @@ textarea {
   font: inherit;
 }
 
+@media screen and (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  #print-area {
+    box-shadow: none;
+  }
+
+  .calendar-day,
+  .calendar-empty-day {
+    min-width: 0;
+  }
+
+  .calendar-day {
+    overflow: hidden;
+  }
+
+  .calendar-day * {
+    min-width: 0;
+  }
+
+  .mobile-action-scroll {
+    scrollbar-width: none;
+  }
+
+  .mobile-action-scroll::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @page {
   size: A4 landscape;
   margin: 7mm;

@@ -33,13 +33,13 @@ export function MonthCalendar({
   return (
     <section
       id="print-area"
-      className={`print-${weekRowCount}weeks mx-auto min-w-[1180px] max-w-[1480px] bg-white px-8 py-7 text-slate-950 shadow-sm`}
+      className={`print-${weekRowCount}weeks mx-auto w-full min-w-0 max-w-[1480px] bg-white px-3 py-4 text-slate-950 shadow-sm sm:px-5 sm:py-6 md:min-w-[1180px] md:px-8 md:py-7`}
     >
-      <div className="mb-7 border-b-[3px] border-[#0b376b] pb-3 text-center">
-        <h2 className="text-3xl font-black tracking-normal text-[#0b376b]">
+      <div className="mb-4 border-b-[3px] border-[#0b376b] pb-3 text-center sm:mb-7">
+        <h2 className="text-2xl font-black tracking-normal text-[#0b376b] sm:text-3xl">
           {schedule.year}년 {schedule.monthIndex + 1}월 A조
         </h2>
-        <p className="mt-1 text-xl font-bold tracking-[0.08em] text-purple-900">
+        <p className="mt-1 text-base font-bold tracking-normal text-purple-900 sm:text-xl sm:tracking-[0.08em]">
           C조: {selectedCTeamNames.join(' ')}
         </p>
       </div>
@@ -64,7 +64,7 @@ export function MonthCalendar({
         {WEEKDAY_LABELS.map((label, index) => (
           <div
             key={label}
-            className={`px-2 py-3 text-center text-lg font-black text-white ${
+            className={`px-1 py-2 text-center text-sm font-black text-white sm:px-2 sm:py-3 sm:text-lg ${
               index === 0 ? 'bg-[#d61f25]' : index === 6 ? 'bg-[#176fc0]' : 'bg-[#062f63]'
             }`}
           >
@@ -77,7 +77,7 @@ export function MonthCalendar({
         {emptyPrefix.map((index) => (
           <div
             key={`empty-${index}`}
-            className="calendar-empty-day min-h-[126px] border-r border-t border-slate-200 bg-white"
+            className="calendar-empty-day min-h-[96px] border-r border-t border-slate-200 bg-white sm:min-h-[126px]"
           />
         ))}
         {schedule.days.map((day) => (
@@ -86,12 +86,12 @@ export function MonthCalendar({
         {emptySuffix.map((index) => (
           <div
             key={`suffix-empty-${index}`}
-            className="calendar-empty-day min-h-[126px] border-r border-t border-slate-200 bg-white"
+            className="calendar-empty-day min-h-[96px] border-r border-t border-slate-200 bg-white sm:min-h-[126px]"
           />
         ))}
       </div>
 
-      <div className="mt-8 grid gap-2 border border-slate-300 p-6">
+      <div className="mt-4 grid gap-2 border border-slate-300 p-3 sm:mt-8 sm:p-6">
         <label className="sr-only text-sm font-black text-slate-700" htmlFor="monthMemo">
           전체 월 메모
         </label>
@@ -99,7 +99,7 @@ export function MonthCalendar({
           id="monthMemo"
           value={monthMemo}
           placeholder="월 전체 공지, 특이사항, 교대 이슈를 기록하세요."
-          className="screen-month-memo min-h-32 resize-none border-0 font-mono text-base leading-8 text-slate-700 focus:border-transparent focus:ring-0"
+          className="screen-month-memo min-h-28 resize-none border-0 font-mono text-sm leading-7 text-slate-700 focus:border-transparent focus:ring-0 sm:min-h-32 sm:text-base sm:leading-8"
           onChange={(event) =>
             onChange({
               ...state,

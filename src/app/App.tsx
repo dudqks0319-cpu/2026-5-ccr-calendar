@@ -197,7 +197,7 @@ export default function App() {
 
       <main className="pb-8">
         {state.ui.viewMode === 'month' ? (
-          <div className="overflow-x-auto px-4 pb-3">
+          <div className="overflow-x-visible px-0 pb-3 sm:px-3 md:overflow-x-auto md:px-4">
             <MonthCalendar
               state={state}
               schedule={schedule}
