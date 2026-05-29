@@ -22,7 +22,12 @@ type PickContext = {
   additionalExcludedNames?: string[];
 };
 
+type GeneratedMonth = MonthSchedule & {
+  finalPointers: Record<ShiftStartType, number>;
+};
+
 const HOLIDAY_LABELS = ['노동절', '어린이날', '석가탄신일', '지방선거', '현충일'];
+const MONTH_CARRY_LOOKBACK_LIMIT = 36;
 
 function normalizeDate(dateKey: string) {
   const date = new Date(dateKey);
@@ -101,15 +106,77 @@ function getPointerAfterWorker(rotation: string[], workerName: string, fallbackP
   return index === null ? fallbackPointer : index + 1;
 }
 
+function getMonthIndexNumber(year: number, monthIndex: number) {
+  return year * 12 + monthIndex;
+}
+
+function parseMonthKey(monthKey: string) {
+  const [year, month] = monthKey.split('-').map(Number);
+  if (!year || !month) return null;
+  return {
+    year,
+    monthIndex: month - 1,
+    value: getMonthIndexNumber(year, month - 1),
+  };
+}
+
+function getPreviousMonth(year: number, monthIndex: number) {
+  if (monthIndex === 0) {
+    return {
+      year: year - 1,
+      monthIndex: 11,
+    };
+  }
+
+  return {
+    year,
+    monthIndex: monthIndex - 1,
+  };
+}
+
+function rotateCTeamKey(baseKey: CTeamKey, monthOffset: number): CTeamKey {
+  const keys: CTeamKey[] = ['A', 'B', 'C', 'D', 'E'];
+  const baseIndex = keys.indexOf(baseKey);
+  if (baseIndex < 0) return baseKey;
+  const nextIndex = ((baseIndex + monthOffset) % keys.length + keys.length) % keys.length;
+  return keys[nextIndex];
+}
+
+function matchCTeamKeyByMembers(state: CCRCalendarState, members: string[]) {
+  if (members.length === 0) return '';
+  return (Object.keys(state.cTeams) as CTeamKey[]).find((teamKey) => {
+    const teamMembers = state.cTeams[teamKey]?.members.filter(Boolean) || [];
+    return teamMembers.length === members.length && teamMembers.every((member, index) => member === members[index]);
+  }) || '';
+}
+
+function getAutoMonthCTeamKey(
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+): CTeamKey {
+  const targetValue = getMonthIndexNumber(year, monthIndex);
+  const anchors = Object.entries(state.monthCTeamKeys)
+    .map(([monthKey, teamKey]) => {
+      const parsed = parseMonthKey(monthKey);
+      return parsed && teamKey ? { ...parsed, teamKey } : null;
+    })
+    .filter((item): item is { year: number; monthIndex: number; value: number; teamKey: CTeamKey } => Boolean(item))
+    .filter((item) => item.value <= targetValue)
+    .sort((left, right) => right.value - left.value);
+
+  const nearestAnchor = anchors[0];
+  if (!nearestAnchor) return state.selectedCTeamKey;
+
+  return rotateCTeamKey(nearestAnchor.teamKey, targetValue - nearestAnchor.value);
+}
+
 export function getCTeamText(dateKey: string, state: CCRCalendarState) {
   const override = state.overrides[dateKey];
   if (override?.cTeamText) return override.cTeamText;
-  const monthCTeamKey = state.monthCTeamKeys[dateKey.slice(0, 7)];
-  if (monthCTeamKey) return state.cTeams[monthCTeamKey]?.members.filter(Boolean).join(', ') || '';
-  const monthMembers = state.monthCTeams[dateKey.slice(0, 7)];
-  if (monthMembers?.length) return monthMembers.filter(Boolean).join(', ');
-  const selectedCTeam = state.cTeams[state.selectedCTeamKey];
-  return selectedCTeam?.members.filter(Boolean).join(', ') || '';
+  const [year, month] = dateKey.slice(0, 7).split('-').map(Number);
+  if (!year || !month) return '';
+  return getMonthCTeamMembers(state, year, month - 1).join(', ');
 }
 
 function parseCTeamText(value: string) {
@@ -129,7 +196,7 @@ export function getMonthCTeamMembers(
   if (monthCTeamKey) return state.cTeams[monthCTeamKey]?.members.filter(Boolean) || [];
   const monthMembers = state.monthCTeams[monthKey];
   if (monthMembers?.length) return monthMembers.filter(Boolean);
-  return state.cTeams[state.selectedCTeamKey]?.members.filter(Boolean) || [];
+  return state.cTeams[getAutoMonthCTeamKey(state, year, monthIndex)]?.members.filter(Boolean) || [];
 }
 
 export function getMonthCTeamKey(
@@ -143,14 +210,11 @@ export function getMonthCTeamKey(
 
   const monthMembers = state.monthCTeams[monthKey]?.filter(Boolean);
   if (monthMembers?.length) {
-    const matched = (Object.keys(state.cTeams) as CTeamKey[]).find((teamKey) => {
-      const members = state.cTeams[teamKey]?.members.filter(Boolean) || [];
-      return members.length === monthMembers.length && members.every((member, index) => member === monthMembers[index]);
-    });
+    const matched = matchCTeamKeyByMembers(state, monthMembers);
     return matched || '';
   }
 
-  return state.selectedCTeamKey;
+  return getAutoMonthCTeamKey(state, year, monthIndex);
 }
 
 export function getDateCTeamMembers(
@@ -238,15 +302,61 @@ export function generateMonthSchedule(
   year = state.selectedYear,
   monthIndex = state.selectedMonthIndex,
 ): MonthSchedule {
+  const { finalPointers: _finalPointers, ...schedule } = generateMonthScheduleWithPointers(
+    state,
+    year,
+    monthIndex,
+  );
+  return schedule;
+}
+
+function getInitialShiftPointers(
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+  depth: number,
+) {
+  const monthKey = toMonthKey(year, monthIndex);
+  const legacyPointer = state.monthStartPointer[monthKey];
+  const explicitShiftPointer = state.monthShiftStartPointer[monthKey];
+  const hasDayPointer = typeof explicitShiftPointer?.day === 'number' || typeof legacyPointer === 'number';
+  const hasNightPointer = typeof explicitShiftPointer?.night === 'number' || typeof legacyPointer === 'number';
+
+  if ((hasDayPointer && hasNightPointer) || depth >= MONTH_CARRY_LOOKBACK_LIMIT) {
+    return {
+      day: explicitShiftPointer?.day ?? legacyPointer ?? 0,
+      night: explicitShiftPointer?.night ?? legacyPointer ?? 0,
+    };
+  }
+
+  const previousMonth = getPreviousMonth(year, monthIndex);
+  const previousSchedule = generateMonthScheduleWithPointers(
+    state,
+    previousMonth.year,
+    previousMonth.monthIndex,
+    depth + 1,
+  );
+
+  return {
+    day: explicitShiftPointer?.day ?? legacyPointer ?? previousSchedule.finalPointers.day,
+    night: explicitShiftPointer?.night ?? legacyPointer ?? previousSchedule.finalPointers.night,
+  };
+}
+
+function generateMonthScheduleWithPointers(
+  state: CCRCalendarState,
+  year = state.selectedYear,
+  monthIndex = state.selectedMonthIndex,
+  depth = 0,
+): GeneratedMonth {
   const daysInMonth = getDaysInMonth(year, monthIndex);
   const firstDayOfMonthWeekday = new Date(year, monthIndex, 1).getDay();
   const baseRotation = buildBaseRotation(state.dayTeams);
   const startWithNight = getMonthStartWithNight(state, year, monthIndex);
-  const monthKey = toMonthKey(year, monthIndex);
   const days: CalendarDay[] = [];
-  const legacyPointer = state.monthStartPointer[monthKey] ?? 0;
-  let dayPointer = state.monthShiftStartPointer[monthKey]?.day ?? legacyPointer;
-  let nightPointer = state.monthShiftStartPointer[monthKey]?.night ?? legacyPointer;
+  const initialPointers = getInitialShiftPointers(state, year, monthIndex, depth);
+  let dayPointer = initialPointers.day;
+  let nightPointer = initialPointers.night;
   const shiftBlockCounts: Record<ShiftStartType, number> = {
     day: 0,
     night: 0,
@@ -387,6 +497,10 @@ export function generateMonthSchedule(
     monthIndex,
     firstDayOfMonthWeekday,
     days,
+    finalPointers: {
+      day: dayPointer,
+      night: nightPointer,
+    },
   };
 }
 

@@ -15,13 +15,18 @@ import {
 } from '../src/logic/generateMonthSchedule.js';
 import { getSealerTeam } from '../src/logic/getSealerTeam.js';
 import { mergeState } from '../src/logic/storage.js';
+import { toMonthKey } from '../src/utils/date.js';
 
 function stateWith(partial: Partial<CCRCalendarState>): CCRCalendarState {
+  const selectedYear = partial.selectedYear ?? DEFAULT_STATE.selectedYear;
+  const selectedMonthIndex = partial.selectedMonthIndex ?? DEFAULT_STATE.selectedMonthIndex;
   return {
     ...structuredClone(DEFAULT_STATE),
     monthCTeams: {},
     monthCTeamKeys: {},
-    monthStartPointer: {},
+    monthStartPointer: {
+      [toMonthKey(selectedYear, selectedMonthIndex)]: 0,
+    },
     monthShiftStartPointer: {},
     monthStartWithNight: {},
     saturdayDefaultOff: false,
@@ -426,6 +431,43 @@ test('6월은 같은 주야 조의 다음 블록을 직전 후반자부터 이�
     assert.equal(['동인', '찬우', '민혁'].includes(day.am), false);
     assert.equal(['동인', '찬우', '민혁'].includes(day.pm), false);
   }
+});
+
+test('다음달 C조는 지정 월을 기준으로 A팀 다음 B팀, 그다음 C팀으로 자동 순환한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+  });
+
+  assert.equal(getMonthCTeamKey(state, 2026, 5), 'A');
+  assert.equal(getMonthCTeamKey(state, 2026, 6), 'B');
+  assert.equal(getMonthCTeamKey(state, 2026, 7), 'C');
+  assert.equal(getMonthCTeamKey(state, 2026, 8), 'D');
+  assert.deepEqual(getMonthCTeamMembers(state, 2026, 6), ['호빈', '찬우', '성운']);
+});
+
+test('7월 첫 야간은 6월 마지막 야간 후반자부터 달을 넘어 이어진다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 6,
+    cTeamExcludeMode: 'none',
+    overrides: {
+      '2026-06-30': {
+        am: '민성',
+        pm: '영빈',
+      },
+    },
+  });
+  const june = generateMonthSchedule(state, 2026, 5);
+  const july = generateMonthSchedule(state, 2026, 6);
+  const june30 = june.days.find((day) => day.dateKey === '2026-06-30');
+  const july1 = july.days.find((day) => day.dateKey === '2026-07-01');
+
+  assert.deepEqual([june30?.am, june30?.pm], ['민성', '영빈']);
+  assert.deepEqual([july1?.am, july1?.pm], ['영빈', '재령']);
+  assert.equal(getMonthCTeamKey(state, 2026, 6), 'B');
 });
 
 test('6월 기본 OFF 토요일은 특근 ON이면 근무일, 특근 OFF이면 다시 OFF가 된다', () => {
