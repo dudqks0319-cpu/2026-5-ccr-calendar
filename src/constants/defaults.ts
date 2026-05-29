@@ -99,6 +99,7 @@ export const DEFAULT_STATE: CCRCalendarState = {
   serverSave: {
     saveKey: '',
     updatedAt: '',
+    revision: 0,
   },
   sealerRotation: {
     enabled: true,

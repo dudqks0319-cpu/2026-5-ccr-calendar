@@ -1,12 +1,13 @@
 import { createPostgresSaveRepository } from '../_lib/db.js';
 import {
+  getClientKey,
   getQueryString,
   sendError,
   sendMethodNotAllowed,
   type ApiRequest,
   type ApiResponse,
 } from '../_lib/http.js';
-import { getServerSaveMaxBytes, readSave, updateSave } from '../_lib/saveCore.js';
+import { ApiError, getServerSaveMaxBytes, readSave, updateSave } from '../_lib/saveCore.js';
 
 export const config = {
   api: {
@@ -22,7 +23,10 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   try {
     if (request.method === 'GET') {
-      const result = await readSave(repository, saveKey, getQueryString(request.query?.pin));
+      if (getQueryString(request.query?.pin)) {
+        throw new ApiError(400, 'PIN은 URL이 아니라 서버 불러오기 입력창으로 보내야 합니다.');
+      }
+      const result = await readSave(repository, saveKey, undefined, getClientKey(request));
       return response.status(200).json(result);
     }
 
@@ -32,6 +36,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
         saveKey,
         request.body,
         getServerSaveMaxBytes(),
+        getClientKey(request),
       );
       return response.status(200).json(result);
     }

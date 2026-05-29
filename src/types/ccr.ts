@@ -117,6 +117,7 @@ export type CCRCalendarState = {
   serverSave: {
     saveKey: string;
     updatedAt: string;
+    revision: number;
   };
   sealerRotation: SealerRotation;
   twoWeekTeamRotation: TwoWeekTeamRotation;

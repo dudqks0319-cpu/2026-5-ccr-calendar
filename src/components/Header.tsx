@@ -38,7 +38,7 @@ export function Header({
 
         <div className="hidden justify-center text-xs font-bold text-slate-500 lg:flex">
           <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-            로컬 자동저장 · 서버/로그인 없음
+            로컬 자동저장 · 선택 서버저장
           </span>
         </div>
 

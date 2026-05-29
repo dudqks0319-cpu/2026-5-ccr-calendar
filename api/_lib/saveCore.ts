@@ -7,6 +7,13 @@ export type SaveRow = {
   pin_hash: string | null;
   state_json: SaveState;
   updated_at: Date | string;
+  revision: number;
+};
+
+export type PinFailureRow = {
+  failure_count: number;
+  blocked_until: Date | string | null;
+  window_started_at: Date | string;
 };
 
 export type SaveRepository = {
@@ -19,7 +26,16 @@ export type SaveRepository = {
   updateSave: (input: {
     saveKey: string;
     state: SaveState;
-  }) => Promise<{ updatedAt: string }>;
+  }) => Promise<{ updatedAt: string; revision: number }>;
+  getPinFailure: (input: { saveKey: string; clientKey: string }) => Promise<PinFailureRow | null>;
+  recordPinFailure: (input: {
+    saveKey: string;
+    clientKey: string;
+    failureCount: number;
+    blockedUntil: string | null;
+    windowStartedAt: string;
+  }) => Promise<void>;
+  clearPinFailure: (input: { saveKey: string; clientKey: string }) => Promise<void>;
 };
 
 export class ApiError extends Error {
@@ -36,6 +52,9 @@ export const SAVE_KEY_PATTERN = /^ccr_[A-Za-z0-9_-]{16,}$/;
 const SAVE_KEY_RANDOM_BYTES = 18;
 const DEFAULT_MAX_BYTES = 500_000;
 const MAX_PIN_LENGTH = 128;
+const PIN_FAILURE_LIMIT = 5;
+const PIN_FAILURE_WINDOW_MS = 10 * 60 * 1000;
+const PIN_BLOCK_MS = 10 * 60 * 1000;
 const SCRYPT_KEY_LENGTH = 32;
 const SCRYPT_OPTIONS = {
   N: 16_384,
@@ -122,6 +141,62 @@ export function assertPinAccess(row: SaveRow, pin: unknown) {
   }
 }
 
+export async function assertPinAccessWithRateLimit(
+  repository: SaveRepository,
+  row: SaveRow,
+  pin: unknown,
+  clientKey: string,
+  now = new Date(),
+) {
+  const normalizedPin = normalizePin(pin);
+  if (!row.pin_hash) return;
+
+  const failure = await repository.getPinFailure({
+    saveKey: row.save_key,
+    clientKey,
+  });
+  const blockedUntil = failure?.blocked_until ? new Date(failure.blocked_until) : null;
+
+  if (blockedUntil && blockedUntil.getTime() > now.getTime()) {
+    throw new ApiError(429, 'PIN 입력 횟수가 많습니다. 10분 후 다시 시도해주세요.');
+  }
+
+  if (verifyPin(normalizedPin, row.pin_hash)) {
+    if (failure) {
+      await repository.clearPinFailure({
+        saveKey: row.save_key,
+        clientKey,
+      });
+    }
+    return;
+  }
+
+  const windowStartedAt = failure?.window_started_at
+    ? new Date(failure.window_started_at)
+    : now;
+  const isSameWindow = now.getTime() - windowStartedAt.getTime() <= PIN_FAILURE_WINDOW_MS;
+  const nextWindowStartedAt = isSameWindow ? windowStartedAt : now;
+  const nextFailureCount = isSameWindow ? (failure?.failure_count || 0) + 1 : 1;
+  const nextBlockedUntil =
+    nextFailureCount >= PIN_FAILURE_LIMIT
+      ? new Date(now.getTime() + PIN_BLOCK_MS).toISOString()
+      : null;
+
+  await repository.recordPinFailure({
+    saveKey: row.save_key,
+    clientKey,
+    failureCount: nextFailureCount,
+    blockedUntil: nextBlockedUntil,
+    windowStartedAt: nextWindowStartedAt.toISOString(),
+  });
+
+  if (nextBlockedUntil) {
+    throw new ApiError(429, 'PIN 입력 횟수가 많습니다. 10분 후 다시 시도해주세요.');
+  }
+
+  throw new ApiError(403, 'PIN이 올바르지 않습니다.');
+}
+
 export function toIsoDate(value: Date | string) {
   return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
 }
@@ -140,18 +215,25 @@ export async function createSave(
   return {
     saveKey,
     updatedAt: result.updatedAt,
+    revision: 1,
   };
 }
 
-export async function readSave(repository: SaveRepository, saveKeyInput: unknown, pinInput: unknown) {
+export async function readSave(
+  repository: SaveRepository,
+  saveKeyInput: unknown,
+  pinInput: unknown,
+  clientKey = 'unknown',
+) {
   const saveKey = validateSaveKey(saveKeyInput);
   const row = await repository.findSave(saveKey);
   if (!row) throw new ApiError(404, '저장키를 찾을 수 없습니다.');
-  assertPinAccess(row, pinInput);
+  await assertPinAccessWithRateLimit(repository, row, pinInput, clientKey);
   return {
     saveKey: row.save_key,
     state: row.state_json,
     updatedAt: toIsoDate(row.updated_at),
+    revision: row.revision,
   };
 }
 
@@ -160,17 +242,23 @@ export async function updateSave(
   saveKeyInput: unknown,
   body: unknown,
   maxBytes = getServerSaveMaxBytes(),
+  clientKey = 'unknown',
 ) {
   const saveKey = validateSaveKey(saveKeyInput);
   const input = parseBodyObject(body);
   const state = validateState(input.state, maxBytes);
+  const lastKnownRevision = validateLastKnownRevision(input.lastKnownRevision);
   const row = await repository.findSave(saveKey);
   if (!row) throw new ApiError(404, '저장키를 찾을 수 없습니다.');
-  assertPinAccess(row, input.pin);
+  await assertPinAccessWithRateLimit(repository, row, input.pin, clientKey);
+  if (row.revision !== lastKnownRevision) {
+    throw new ApiError(409, '서버에 더 최신 근무표가 있습니다. 먼저 서버에서 다시 불러온 뒤 저장해주세요.');
+  }
   const result = await repository.updateSave({ saveKey, state });
   return {
     saveKey,
     updatedAt: result.updatedAt,
+    revision: result.revision,
   };
 }
 
@@ -179,4 +267,11 @@ function parseBodyObject(body: unknown) {
     throw new ApiError(400, '요청 본문이 올바르지 않습니다.');
   }
   return body as Record<string, unknown>;
+}
+
+function validateLastKnownRevision(value: unknown) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
+    throw new ApiError(409, '서버 저장 기준 정보가 없습니다. 먼저 서버에서 다시 불러온 뒤 저장해주세요.');
+  }
+  return value;
 }

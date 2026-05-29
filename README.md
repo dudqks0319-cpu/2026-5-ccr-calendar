@@ -58,21 +58,35 @@ CREATE TABLE IF NOT EXISTS ccr_calendar_saves (
   save_key text PRIMARY KEY,
   pin_hash text NULL,
   state_json jsonb NOT NULL,
+  revision integer NOT NULL DEFAULT 1,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS ccr_calendar_pin_failures (
+  save_key text NOT NULL,
+  client_key text NOT NULL,
+  failure_count integer NOT NULL DEFAULT 0,
+  blocked_until timestamptz NULL,
+  window_started_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (save_key, client_key)
 );
 ```
 
 API:
 
 - `POST /api/saves/create`
-- `GET /api/saves/:saveKey?pin=optional`
+- `POST /api/saves/load`
 - `PUT /api/saves/:saveKey`
 
 주의:
 
 - `DATABASE_URL`은 Vercel 환경변수에만 넣고 클라이언트 코드에는 넣지 않습니다.
-- PIN은 선택 기능이며 원문을 저장하지 않고 Node `scrypt` 해시로 저장합니다.
+- PIN은 선택 기능이지만 6자리 이상 사용을 권장합니다. 원문은 저장하지 않고 Node `scrypt` 해시로 저장합니다.
+- PIN은 URL query에 넣지 않고 `POST /api/saves/load` 본문으로만 보냅니다.
+- 잘못된 PIN은 `saveKey + IP` 기준 5회 실패 시 10분간 `429`로 차단합니다.
+- 수정 저장은 서버 `revision`을 확인하며, 다른 사용자가 먼저 저장한 경우 `409 Conflict`를 반환합니다.
 - 저장키를 잃어버리면 복구할 수 없으므로 JSON 백업도 함께 보관하세요.
 
 ## 단일 HTML

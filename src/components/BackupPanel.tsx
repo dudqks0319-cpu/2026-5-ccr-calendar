@@ -73,12 +73,18 @@ export function BackupPanel({
     }
   }
 
-  function stateWithServerSave(saveKey: string, updatedAt: string, baseState = state) {
+  function stateWithServerSave(
+    saveKey: string,
+    updatedAt: string,
+    revision: number,
+    baseState = state,
+  ) {
     return {
       ...baseState,
       serverSave: {
         saveKey,
         updatedAt,
+        revision,
       },
       updatedAt: new Date().toISOString(),
     };
@@ -86,10 +92,27 @@ export function BackupPanel({
 
   async function handleCreateServerSave() {
     await runServerAction(async () => {
+      if (!serverPin) {
+        const confirmed = window.confirm(
+          'PIN 없이 서버 저장을 만들면 저장키나 공유 링크를 아는 사람이 근무표를 볼 수 있고 수정도 할 수 있습니다.\n\n그래도 PIN 없이 만들까요?',
+        );
+        if (!confirmed) {
+          setServerStatus('PIN을 입력한 뒤 서버 저장을 만들어주세요. 6자리 이상을 권장합니다.');
+          return;
+        }
+      } else if (serverPin.length < 6) {
+        const confirmed = window.confirm(
+          'PIN은 6자리 이상을 권장합니다. 짧은 PIN은 공유 링크가 노출됐을 때 추측될 위험이 더 큽니다.\n\n이 PIN으로 계속할까요?',
+        );
+        if (!confirmed) {
+          setServerStatus('6자리 이상 PIN을 권장합니다.');
+          return;
+        }
+      }
       setServerStatus('서버 저장키 생성 중');
       const result = await createServerSave(state, serverPin);
       setServerSaveKey(result.saveKey);
-      onChange(stateWithServerSave(result.saveKey, result.updatedAt));
+      onChange(stateWithServerSave(result.saveKey, result.updatedAt, result.revision));
       setServerStatus(`서버 저장 생성 완료 · ${result.saveKey}`);
     });
   }
@@ -100,10 +123,17 @@ export function BackupPanel({
         setServerStatus('저장키를 입력해주세요.');
         return;
       }
+      const confirmed = window.confirm(
+        '서버 근무표를 불러오면 현재 브라우저의 근무표가 서버 데이터로 바뀝니다.\n\n계속 불러올까요?',
+      );
+      if (!confirmed) {
+        setServerStatus('서버 불러오기를 취소했습니다.');
+        return;
+      }
       setServerStatus('서버에서 근무표 불러오는 중');
       const result = await loadServerSave(activeSaveKey, serverPin);
       setServerSaveKey(result.saveKey);
-      onChange(stateWithServerSave(result.saveKey, result.updatedAt, result.state));
+      onChange(stateWithServerSave(result.saveKey, result.updatedAt, result.revision, result.state));
       setServerStatus('서버 근무표를 불러왔고 브라우저 로컬에도 저장됩니다.');
     });
   }
@@ -117,7 +147,7 @@ export function BackupPanel({
       setServerStatus('현재 근무표 서버 저장 중');
       const result = await updateServerSave(activeSaveKey, state, serverPin);
       setServerSaveKey(result.saveKey);
-      onChange(stateWithServerSave(result.saveKey, result.updatedAt));
+      onChange(stateWithServerSave(result.saveKey, result.updatedAt, result.revision));
       setServerStatus('현재 근무표를 서버에 저장했습니다.');
     });
   }
@@ -128,7 +158,7 @@ export function BackupPanel({
         <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-950">
           <p className="font-black">로그인 없이 저장키로 서버에 저장합니다. 저장키를 잃어버리면 복구할 수 없습니다.</p>
           <p>중요한 근무표는 JSON 백업도 함께 저장해 주세요.</p>
-          <p>공유 링크를 아는 사람은 근무표를 볼 수 있으니 주의하세요.</p>
+          <p>공유 링크를 아는 사람은 근무표를 볼 수 있고, PIN이 없으면 수정도 할 수 있습니다.</p>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -165,7 +195,8 @@ export function BackupPanel({
               <Input
                 value={serverPin}
                 type="password"
-                placeholder="PIN을 설정했거나 필요한 경우 입력"
+                inputMode="numeric"
+                placeholder="6자리 이상 권장"
                 onChange={(event) => setServerPin(event.target.value)}
               />
             </label>
@@ -219,7 +250,7 @@ export function BackupPanel({
             </div>
           </dl>
           <p className="mt-3 break-words text-xs font-bold leading-5 text-slate-600">
-            {serverStatus || '서버 저장은 자동 실행되지 않습니다. 필요할 때 직접 저장 버튼을 눌러주세요.'}
+            {serverStatus || '서버 저장은 자동 실행되지 않습니다. 실패해도 브라우저 로컬 저장은 유지됩니다.'}
           </p>
         </div>
 

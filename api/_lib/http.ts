@@ -30,3 +30,13 @@ export function getQueryString(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] || '';
   return value || '';
 }
+
+export function getClientKey(request: ApiRequest) {
+  const forwardedFor = request.headers['x-forwarded-for'];
+  const rawForwardedFor = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+  return (
+    rawForwardedFor?.split(',')[0]?.trim() ||
+    request.socket.remoteAddress ||
+    'unknown'
+  );
+}

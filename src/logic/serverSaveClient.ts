@@ -4,12 +4,14 @@ import { mergeState } from './storage.js';
 type ServerSaveCreateResponse = {
   saveKey: string;
   updatedAt: string;
+  revision: number;
 };
 
 type ServerSaveLoadResponse = {
   saveKey: string;
   state: CCRCalendarState;
   updatedAt: string;
+  revision: number;
 };
 
 async function parseServerResponse<T>(response: Response): Promise<T> {
@@ -22,10 +24,6 @@ async function parseServerResponse<T>(response: Response): Promise<T> {
     throw new Error(message);
   }
   return body as T;
-}
-
-function pinQuery(pin: string) {
-  return pin ? `?pin=${encodeURIComponent(pin)}` : '';
 }
 
 export async function createServerSave(state: CCRCalendarState, pin: string) {
@@ -44,7 +42,16 @@ export async function createServerSave(state: CCRCalendarState, pin: string) {
 }
 
 export async function loadServerSave(saveKey: string, pin: string) {
-  const response = await fetch(`/api/saves/${encodeURIComponent(saveKey)}${pinQuery(pin)}`);
+  const response = await fetch('/api/saves/load', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      saveKey,
+      pin: pin || undefined,
+    }),
+  });
   const result = await parseServerResponse<ServerSaveLoadResponse>(response);
   return {
     ...result,
@@ -61,6 +68,7 @@ export async function updateServerSave(saveKey: string, state: CCRCalendarState,
     body: JSON.stringify({
       state,
       pin: pin || undefined,
+      lastKnownRevision: state.serverSave.revision || undefined,
     }),
   });
 
@@ -69,11 +77,15 @@ export async function updateServerSave(saveKey: string, state: CCRCalendarState,
 
 export function getInitialSaveKeyFromUrl() {
   if (typeof window === 'undefined') return '';
+  const hashValue = window.location.hash.replace(/^#/, '');
+  const hashSaveKey = new URLSearchParams(hashValue).get('save_key');
+  if (hashSaveKey) return hashSaveKey;
   return new URLSearchParams(window.location.search).get('save_key') || '';
 }
 
 export function buildShareUrl(saveKey: string) {
   const url = new URL(window.location.href);
-  url.searchParams.set('save_key', saveKey);
+  url.searchParams.delete('save_key');
+  url.hash = new URLSearchParams({ save_key: saveKey }).toString();
   return url.toString();
 }
