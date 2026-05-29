@@ -103,6 +103,7 @@ export type CCRCalendarState = {
   monthCTeamKeys: Partial<Record<string, CTeamKey>>;
   monthCTeams: Record<string, string[]>;
   monthStartPointer: Record<string, number>;
+  monthShiftStartPointer: Record<string, Partial<Record<ShiftStartType, number>>>;
   monthStartAnchors: Record<string, Partial<Record<ShiftStartType, MonthStartAnchor>>>;
   selectedCTeamKey: CTeamKey;
   dayTeams: Record<TeamKey, TeamConfig>;

@@ -302,6 +302,15 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
         ...state.monthStartPointer,
         [monthKey]: pointer,
       },
+      monthShiftStartPointer: {
+        ...state.monthShiftStartPointer,
+        [monthKey]: {
+          ...state.monthShiftStartPointer[monthKey],
+          ...Object.fromEntries(
+            Object.keys(anchorsToSave).map((shift) => [shift, pointer]),
+          ),
+        },
+      },
     });
   }
 
@@ -860,6 +869,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                   monthCTeamKeys: DEFAULT_STATE.monthCTeamKeys,
                   monthCTeams: DEFAULT_STATE.monthCTeams,
                   monthStartPointer: DEFAULT_STATE.monthStartPointer,
+                  monthShiftStartPointer: DEFAULT_STATE.monthShiftStartPointer,
                   monthStartAnchors: DEFAULT_STATE.monthStartAnchors,
                   monthStartWithNight: DEFAULT_STATE.monthStartWithNight,
                   saturdayDefaultOff: DEFAULT_STATE.saturdayDefaultOff,

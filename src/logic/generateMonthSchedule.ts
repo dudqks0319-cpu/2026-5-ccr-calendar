@@ -233,7 +233,9 @@ export function generateMonthSchedule(
   const startWithNight = getMonthStartWithNight(state, year, monthIndex);
   const monthKey = toMonthKey(year, monthIndex);
   const days: CalendarDay[] = [];
-  let pointer = state.monthStartPointer[monthKey] ?? 0;
+  const legacyPointer = state.monthStartPointer[monthKey] ?? 0;
+  let dayPointer = state.monthShiftStartPointer[monthKey]?.day ?? legacyPointer;
+  let nightPointer = state.monthShiftStartPointer[monthKey]?.night ?? legacyPointer;
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateKey = toDateKey(year, monthIndex, day);
@@ -276,6 +278,7 @@ export function generateMonthSchedule(
       continue;
     }
 
+    const pointer = isNight ? nightPointer : dayPointer;
     const pickContext: PickContext = {
       isNight,
       selectedCTeamMembers,
@@ -284,13 +287,21 @@ export function generateMonthSchedule(
       materialRule: state.materialRule,
     };
     const autoAm = pickNextWorker(baseRotation, pointer, pickContext);
+    const canUseOverrideAm =
+      Boolean(override?.am) && !shouldExcludeWorker(override?.am || '', pickContext);
+    const am = canUseOverrideAm ? override?.am || '' : autoAm.workerName;
+
     const autoPm = pickNextWorker(baseRotation, autoAm.nextPointer, {
       ...pickContext,
-      additionalExcludedNames: autoAm.workerName ? [autoAm.workerName] : [],
+      additionalExcludedNames: am ? [am] : [],
     });
-
-    const am = override?.am || autoAm.workerName;
-    const pm = override?.pm || autoPm.workerName;
+    const overridePmContext = {
+      ...pickContext,
+      additionalExcludedNames: am ? [am] : [],
+    };
+    const canUseOverridePm =
+      Boolean(override?.pm) && !shouldExcludeWorker(override?.pm || '', overridePmContext);
+    const pm = canUseOverridePm ? override?.pm || '' : autoPm.workerName;
 
     days.push({
       dateKey,
@@ -312,7 +323,11 @@ export function generateMonthSchedule(
       userComment: labels.userComment,
     });
 
-    pointer += 1;
+    if (isNight) {
+      nightPointer += 1;
+    } else {
+      dayPointer += 1;
+    }
   }
 
   return {
@@ -347,6 +362,13 @@ export function findMonthStartPointerForAnchors(
       monthStartPointer: {
         ...state.monthStartPointer,
         [monthKey]: pointer,
+      },
+      monthShiftStartPointer: {
+        ...state.monthShiftStartPointer,
+        [monthKey]: {
+          ...state.monthShiftStartPointer[monthKey],
+          ...Object.fromEntries(validAnchors.map((anchor) => [anchor.shift, pointer])),
+        },
       },
     };
     const schedule = generateMonthSchedule(candidateState, year, monthIndex);
