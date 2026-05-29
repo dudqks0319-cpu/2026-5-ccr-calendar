@@ -74,6 +74,108 @@ function flattenCTeamDepartments(departments: CTeamDepartments) {
   return C_TEAM_MEMBER_DISPLAY_ORDER.flatMap((teamKey) => departments[teamKey] || []).filter(Boolean);
 }
 
+function normalizeMemberList(members: string[]) {
+  return members.map((member) => member.trim()).filter(Boolean);
+}
+
+function OrderedMemberEditor({
+  label,
+  members,
+  onChange,
+}: {
+  label: string;
+  members: string[];
+  onChange: (members: string[]) => void;
+}) {
+  const editableMembers = members.length > 0 ? members : [''];
+
+  function updateMember(index: number, value: string) {
+    const nextMembers = [...editableMembers];
+    nextMembers[index] = value;
+    onChange(nextMembers);
+  }
+
+  function moveMember(index: number, direction: -1 | 1) {
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= editableMembers.length) return;
+    const nextMembers = [...editableMembers];
+    [nextMembers[index], nextMembers[targetIndex]] = [nextMembers[targetIndex], nextMembers[index]];
+    onChange(nextMembers);
+  }
+
+  function removeMember(index: number) {
+    const nextMembers = editableMembers.filter((_, memberIndex) => memberIndex !== index);
+    onChange(nextMembers.length > 0 ? nextMembers : ['']);
+  }
+
+  return (
+    <section className="grid min-w-0 max-w-full gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-black text-slate-800">{label}</h4>
+        <Button
+          type="button"
+          variant="secondary"
+          className="h-9 min-h-9 px-2 text-xs"
+          onClick={() => onChange([...editableMembers, ''])}
+        >
+          이름 추가
+        </Button>
+      </div>
+
+      <div className="grid min-w-0 gap-2">
+        {editableMembers.map((member, index) => (
+          <div
+            key={`${label}-${index}`}
+            className="grid min-w-0 max-w-full grid-cols-[40px_minmax(0,1fr)] items-center gap-2 rounded-md bg-white p-2 sm:grid-cols-[40px_minmax(0,1fr)_auto] sm:bg-transparent sm:p-0"
+          >
+            <span className="grid h-11 place-items-center rounded-md bg-white text-sm font-black text-slate-500">
+              {index + 1}
+            </span>
+            <Input
+              value={member}
+              className="min-w-0"
+              placeholder={`${index + 1}순번 이름`}
+              onChange={(event) => updateMember(index, event.target.value)}
+              onBlur={() => onChange(normalizeMemberList(editableMembers))}
+            />
+            <div className="col-span-2 flex gap-1 sm:col-span-1">
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 min-h-10 flex-1 px-0 sm:size-11 sm:min-h-11 sm:flex-none"
+                onClick={() => moveMember(index, -1)}
+                disabled={index === 0}
+                aria-label={`${member || index + 1} 위로 이동`}
+              >
+                ↑
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10 min-h-10 flex-1 px-0 sm:size-11 sm:min-h-11 sm:flex-none"
+                onClick={() => moveMember(index, 1)}
+                disabled={index === editableMembers.length - 1}
+                aria-label={`${member || index + 1} 아래로 이동`}
+              >
+                ↓
+              </Button>
+              <Button
+                type="button"
+                variant="danger"
+                className="h-10 min-h-10 flex-[1.4] px-2 sm:h-11 sm:w-14 sm:flex-none"
+                onClick={() => removeMember(index)}
+                aria-label={`${member || index + 1} 삭제`}
+              >
+                삭제
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('teams');
   const rotationPreview = useMemo(() => buildBaseRotation(state.dayTeams), [state.dayTeams]);
@@ -87,27 +189,14 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
   );
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || '설정';
 
-  function updateDayTeam(teamKey: TeamKey, membersText: string) {
+  function updateDayTeamMembers(teamKey: TeamKey, members: string[]) {
     onChange({
       ...state,
       dayTeams: {
         ...state.dayTeams,
         [teamKey]: {
           ...state.dayTeams[teamKey],
-          members: parseNames(membersText),
-        },
-      },
-    });
-  }
-
-  function updateCTeam(teamKey: CTeamKey, membersText: string) {
-    onChange({
-      ...state,
-      cTeams: {
-        ...state.cTeams,
-        [teamKey]: {
-          ...state.cTeams[teamKey],
-          members: parseNames(membersText),
+          members,
         },
       },
     });
@@ -204,7 +293,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
 
   return (
     <Modal title="설정" onClose={onClose} width="max-w-6xl">
-      <div className="grid gap-4 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-5">
+      <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[190px_minmax(0,1fr)] lg:gap-5">
         <aside className="no-print rounded-lg border border-slate-200 bg-slate-50 p-2">
           <div className="px-2 pb-2 text-xs font-black text-slate-500">설정 항목</div>
           <div className="flex gap-1 overflow-x-auto pb-1 lg:grid lg:overflow-visible lg:pb-0">
@@ -222,8 +311,8 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
           </div>
         </aside>
 
-        <div className="grid min-w-0 gap-4">
-          <section className="grid gap-4 rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
+        <div className="grid min-w-0 max-w-full gap-4 overflow-hidden">
+          <section className="grid min-w-0 max-w-full gap-4 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 sm:p-4">
             <div className="flex flex-wrap items-end justify-between gap-3 border-b border-slate-100 pb-3">
               <h3 className="text-lg font-black text-slate-950">{activeTabLabel}</h3>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
@@ -232,15 +321,15 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
             </div>
 
         {activeTab === 'teams' ? (
-          <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-            <div className="grid gap-3">
+          <div className="grid min-w-0 max-w-full grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="grid min-w-0 max-w-full gap-3">
               {TEAM_KEYS.map((teamKey) => (
-                <Field key={teamKey} label={`${state.dayTeams[teamKey].label} 팀원`}>
-                  <Textarea
-                    value={namesToText(state.dayTeams[teamKey].members)}
-                    onChange={(event) => updateDayTeam(teamKey, event.target.value)}
-                  />
-                </Field>
+                <OrderedMemberEditor
+                  key={teamKey}
+                  label={`${state.dayTeams[teamKey].label} 팀원`}
+                  members={state.dayTeams[teamKey].members}
+                  onChange={(members) => updateDayTeamMembers(teamKey, members)}
+                />
               ))}
             </div>
             <aside className="rounded-lg border border-slate-200 bg-slate-50 p-3 sm:p-4">
