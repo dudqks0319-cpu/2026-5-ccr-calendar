@@ -80,6 +80,10 @@ export function CalendarControls({
                   ...state.monthCTeamKeys,
                   [monthKey]: event.target.value as CTeamKey,
                 },
+                monthCTeamKeyOverrides: {
+                  ...state.monthCTeamKeyOverrides,
+                  [monthKey]: true,
+                },
               })
             }
           >

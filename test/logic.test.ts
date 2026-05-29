@@ -447,6 +447,51 @@ test('다음달 C조는 지정 월을 기준으로 A팀 다음 B팀, 그다음 C
   assert.deepEqual(getMonthCTeamMembers(state, 2026, 6), ['호빈', '찬우', '성운']);
 });
 
+test('기존 저장값에 미래 월 A팀이 박혀 있어도 자동 C조 순환으로 정리한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 6,
+    cTeams: {
+      A: {
+        label: 'A팀',
+        members: ['동인', '찬우', '민혁'],
+        departments: {
+          conveyor: ['동인'],
+          robot: ['찬우'],
+          main: ['민혁'],
+        },
+      },
+    } as CCRCalendarState['cTeams'],
+    monthCTeamKeys: {
+      '2026-07': 'A',
+    },
+    monthCTeams: {
+      '2026-07': ['동인', '찬우', '민혁'],
+    },
+  });
+
+  assert.equal(state.monthCTeamKeys['2026-07'], undefined);
+  assert.equal(getMonthCTeamKey(state, 2026, 6), 'B');
+  assert.deepEqual(getMonthCTeamMembers(state, 2026, 6), ['호빈', '찬우', '성운']);
+});
+
+test('새 UI에서 수동으로 고른 월별 C조는 자동 정리하지 않고 보존한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 6,
+    monthCTeamKeys: {
+      '2026-07': 'A',
+    },
+    monthCTeamKeyOverrides: {
+      '2026-07': true,
+    },
+  });
+
+  assert.equal(getMonthCTeamKey(state, 2026, 6), 'A');
+});
+
 test('7월 첫 야간은 6월 마지막 야간 후반자부터 달을 넘어 이어진다', () => {
   const state = mergeState({
     version: 2,

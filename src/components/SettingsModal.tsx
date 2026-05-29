@@ -396,6 +396,10 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                         ...state.monthCTeamKeys,
                         [monthKey]: event.target.value as CTeamKey,
                       },
+                      monthCTeamKeyOverrides: {
+                        ...state.monthCTeamKeyOverrides,
+                        [monthKey]: true,
+                      },
                     })
                   }
                 >

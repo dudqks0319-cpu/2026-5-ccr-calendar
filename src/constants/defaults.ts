@@ -12,6 +12,7 @@ export const DEFAULT_STATE: CCRCalendarState = {
     '2026-05': 'A',
     '2026-06': 'A',
   },
+  monthCTeamKeyOverrides: {},
   monthCTeams: {
     '2026-04': ['선우', '영빈', '우용'],
     '2026-05': ['민성', '서용', '재령'],

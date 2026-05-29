@@ -103,6 +103,7 @@ export type CCRCalendarState = {
   startWithNight: boolean;
   monthStartWithNight: Record<string, boolean>;
   monthCTeamKeys: Partial<Record<string, CTeamKey>>;
+  monthCTeamKeyOverrides: Record<string, boolean>;
   monthCTeams: Record<string, string[]>;
   monthStartPointer: Record<string, number>;
   monthShiftStartPointer: Record<string, Partial<Record<ShiftStartType, number>>>;

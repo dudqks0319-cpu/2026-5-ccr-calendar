@@ -2,7 +2,7 @@ import { C_TEAM_KEYS, DEFAULT_STATE, STORAGE_KEY } from '../constants/defaults.j
 import { applyApril2026PhotoPreset } from '../constants/april2026Preset.js';
 import { applyJune2026PhotoPreset } from '../constants/june2026Preset.js';
 import { applyMay2026PhotoPreset } from '../constants/may2026Preset.js';
-import type { CCRCalendarState, DayOverride } from '../types/ccr.js';
+import type { CCRCalendarState, CTeamKey, DayOverride } from '../types/ccr.js';
 import { downloadTextFile, toDateKey } from '../utils/date.js';
 
 function cTeamDepartmentsFromMembers(members: string[]) {
@@ -16,6 +16,79 @@ function cTeamDepartmentsFromMembers(members: string[]) {
 function cloneDefaultState(): CCRCalendarState {
   const state = JSON.parse(JSON.stringify(DEFAULT_STATE)) as CCRCalendarState;
   return applyJune2026PhotoPreset(applyMay2026PhotoPreset(applyApril2026PhotoPreset(state)));
+}
+
+function sameNames(left: string[] = [], right: string[] = []) {
+  const normalizedLeft = left.filter(Boolean);
+  const normalizedRight = right.filter(Boolean);
+  return (
+    normalizedLeft.length === normalizedRight.length &&
+    normalizedLeft.every((name, index) => name === normalizedRight[index])
+  );
+}
+
+function findMatchingCTeamKey(
+  cTeams: CCRCalendarState['cTeams'],
+  members: string[],
+): CTeamKey | '' {
+  return C_TEAM_KEYS.find((teamKey) => sameNames(cTeams[teamKey].members, members)) || '';
+}
+
+function normalizeMonthCTeamKeys(
+  defaultKeys: CCRCalendarState['monthCTeamKeys'],
+  parsedKeys: CCRCalendarState['monthCTeamKeys'] | undefined,
+  manualFlags: Record<string, boolean>,
+) {
+  const merged = {
+    ...defaultKeys,
+    ...parsedKeys,
+  };
+  const normalized: CCRCalendarState['monthCTeamKeys'] = {};
+  let previousKey: CTeamKey | undefined;
+
+  for (const monthKey of Object.keys(merged).sort()) {
+    const cTeamKey = merged[monthKey];
+    if (!cTeamKey) continue;
+
+    const isDefaultKey = Object.prototype.hasOwnProperty.call(defaultKeys, monthKey);
+    const isManualKey = manualFlags[monthKey] === true;
+
+    if (!isDefaultKey && !isManualKey && previousKey === cTeamKey) {
+      continue;
+    }
+
+    normalized[monthKey] = cTeamKey;
+    previousKey = cTeamKey;
+  }
+
+  return normalized;
+}
+
+function normalizeMonthCTeams(
+  defaultMonthCTeams: CCRCalendarState['monthCTeams'],
+  parsedMonthCTeams: CCRCalendarState['monthCTeams'] | undefined,
+  cTeams: CCRCalendarState['cTeams'],
+  manualFlags: Record<string, boolean>,
+) {
+  const merged = {
+    ...defaultMonthCTeams,
+    ...parsedMonthCTeams,
+  };
+  const normalized: CCRCalendarState['monthCTeams'] = {};
+
+  for (const [monthKey, members] of Object.entries(merged)) {
+    const isDefaultMonth = Object.prototype.hasOwnProperty.call(defaultMonthCTeams, monthKey);
+    const isManualMonth = manualFlags[monthKey] === true;
+    const matchedTeamKey = findMatchingCTeamKey(cTeams, members);
+
+    if (!isDefaultMonth && !isManualMonth && matchedTeamKey) {
+      continue;
+    }
+
+    normalized[monthKey] = members;
+  }
+
+  return normalized;
 }
 
 function mergeOverrides(
@@ -54,6 +127,47 @@ function mergeOverrides(
 
 export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState {
   const defaults = cloneDefaultState();
+  const mergedCTeams = {
+    ...defaults.cTeams,
+    ...Object.fromEntries(
+      C_TEAM_KEYS.map((key) => {
+        const parsedTeam = parsed.cTeams?.[key];
+        const defaultTeam = defaults.cTeams[key];
+        const members = parsedTeam?.members ?? defaultTeam.members;
+        const departments = parsedTeam?.departments
+          ? {
+              ...defaultTeam.departments,
+              ...parsedTeam.departments,
+            }
+          : cTeamDepartmentsFromMembers(members);
+        return [
+          key,
+          {
+            ...defaultTeam,
+            ...parsedTeam,
+            members,
+            departments,
+          },
+        ];
+      }),
+    ),
+  } as CCRCalendarState['cTeams'];
+  const mergedManualMonthCTeamFlags = {
+    ...defaults.monthCTeamKeyOverrides,
+    ...parsed.monthCTeamKeyOverrides,
+  };
+  const mergedMonthCTeamKeys = normalizeMonthCTeamKeys(
+    defaults.monthCTeamKeys,
+    parsed.monthCTeamKeys,
+    mergedManualMonthCTeamFlags,
+  );
+  const mergedMonthCTeams = normalizeMonthCTeams(
+    defaults.monthCTeams,
+    parsed.monthCTeams,
+    mergedCTeams,
+    mergedManualMonthCTeamFlags,
+  );
+
   return {
     ...defaults,
     ...parsed,
@@ -61,43 +175,14 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
       ...defaults.dayTeams,
       ...parsed.dayTeams,
     },
-    cTeams: {
-      ...defaults.cTeams,
-      ...Object.fromEntries(
-        C_TEAM_KEYS.map((key) => {
-          const parsedTeam = parsed.cTeams?.[key];
-          const defaultTeam = defaults.cTeams[key];
-          const members = parsedTeam?.members ?? defaultTeam.members;
-          const departments = parsedTeam?.departments
-            ? {
-                ...defaultTeam.departments,
-                ...parsedTeam.departments,
-              }
-            : cTeamDepartmentsFromMembers(members);
-          return [
-            key,
-            {
-              ...defaultTeam,
-              ...parsedTeam,
-              members,
-              departments,
-            },
-          ];
-        }),
-      ),
-    },
+    cTeams: mergedCTeams,
     monthStartWithNight: {
       ...defaults.monthStartWithNight,
       ...parsed.monthStartWithNight,
     },
-    monthCTeamKeys: {
-      ...defaults.monthCTeamKeys,
-      ...parsed.monthCTeamKeys,
-    },
-    monthCTeams: {
-      ...defaults.monthCTeams,
-      ...parsed.monthCTeams,
-    },
+    monthCTeamKeys: mergedMonthCTeamKeys,
+    monthCTeamKeyOverrides: mergedManualMonthCTeamFlags,
+    monthCTeams: mergedMonthCTeams,
     monthStartPointer: {
       ...defaults.monthStartPointer,
       ...parsed.monthStartPointer,
