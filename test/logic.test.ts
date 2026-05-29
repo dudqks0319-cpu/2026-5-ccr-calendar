@@ -7,6 +7,7 @@ import {
   findMonthStartPointerForAnchors,
   generateMonthSchedule,
   getDateCTeamMembers,
+  getMonthCTeamKey,
   getMonthCTeamMembers,
   getTwoWeekTeamLabel,
   isDateOff,
@@ -19,6 +20,7 @@ function stateWith(partial: Partial<CCRCalendarState>): CCRCalendarState {
   return {
     ...structuredClone(DEFAULT_STATE),
     monthCTeams: {},
+    monthCTeamKeys: {},
     monthStartPointer: {},
     monthStartWithNight: {},
     saturdayDefaultOff: false,
@@ -126,6 +128,23 @@ test('C조는 야간 주차에만 표시하고 일요일 야간도 조기가동 
   assert.equal(sunday?.cTeamText, '민성, 광수, 이진');
   assert.equal(nextWeekMonday?.isNight, false);
   assert.equal(nextWeekMonday?.cTeamText, '');
+});
+
+test('월별 C조 팀 선택은 전역 선택값과 직접 입력값보다 우선한다', () => {
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 4,
+    selectedCTeamKey: 'A',
+    monthCTeamKeys: {
+      '2026-05': 'B',
+    },
+    monthCTeams: {
+      '2026-05': ['직접', '입력', '값'],
+    },
+  });
+
+  assert.equal(getMonthCTeamKey(state, 2026, 4), 'B');
+  assert.deepEqual(getMonthCTeamMembers(state, 2026, 4), ['호빈', '찬우', '성운']);
 });
 
 test('날짜별 C조 직접 수정은 해당 날짜만 우선한다', () => {
@@ -258,6 +277,19 @@ test('주간/야간 시작 기준 지정은 월 시작 순번을 역산해서 �
   );
   const target = schedule.days.find((day) => day.dateKey === anchor.dateKey);
   assert.deepEqual([target?.am, target?.pm], [anchor.am, anchor.pm]);
+});
+
+test('주야 기준이 서로 충돌해도 적용한 단일 기준은 역산할 수 있다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+  });
+  const dayAnchor = { dateKey: '2026-06-08', shift: 'day' as const, am: '동인', pm: '서용' };
+  const nightAnchor = { dateKey: '2026-06-01', shift: 'night' as const, am: '우용', pm: '선우' };
+
+  assert.equal(findMonthStartPointerForAnchors(state, 2026, 5, [dayAnchor, nightAnchor]), null);
+  assert.equal(findMonthStartPointerForAnchors(state, 2026, 5, [dayAnchor]), 2);
 });
 
 test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이어지고 토요일 특근이 없다', () => {

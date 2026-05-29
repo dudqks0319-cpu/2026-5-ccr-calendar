@@ -39,6 +39,10 @@ export function applyJune2026PhotoPreset(state: CCRCalendarState): CCRCalendarSt
       ...state.monthStartWithNight,
       '2026-06': true,
     },
+    monthCTeamKeys: {
+      ...state.monthCTeamKeys,
+      '2026-06': 'A',
+    },
     monthCTeams: {
       ...state.monthCTeams,
       '2026-06': ['민성', '서용', '재령'],

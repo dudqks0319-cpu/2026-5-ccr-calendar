@@ -56,6 +56,10 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
       ...defaults.monthStartWithNight,
       ...parsed.monthStartWithNight,
     },
+    monthCTeamKeys: {
+      ...defaults.monthCTeamKeys,
+      ...parsed.monthCTeamKeys,
+    },
     monthCTeams: {
       ...defaults.monthCTeams,
       ...parsed.monthCTeams,

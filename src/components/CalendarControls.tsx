@@ -1,7 +1,7 @@
 import type { CCRCalendarState, CTeamKey } from '../types/ccr.js';
 import { C_TEAM_KEYS } from '../constants/defaults.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
-import { getMonthStartWithNight } from '../logic/generateMonthSchedule.js';
+import { getMonthCTeamKey, getMonthStartWithNight } from '../logic/generateMonthSchedule.js';
 import { toMonthKey } from '../utils/date.js';
 import { Button, Field, Select } from './ui.js';
 
@@ -23,6 +23,7 @@ export function CalendarControls({
   const allWorkers = buildBaseRotation(state.dayTeams);
   const years = Array.from({ length: 11 }, (_, index) => state.selectedYear - 5 + index);
   const monthKey = toMonthKey(state.selectedYear, state.selectedMonthIndex);
+  const currentMonthCTeamKey = getMonthCTeamKey(state, state.selectedYear, state.selectedMonthIndex);
   const currentStartWithNight = getMonthStartWithNight(
     state,
     state.selectedYear,
@@ -70,14 +71,21 @@ export function CalendarControls({
 
         <Field label="C조">
           <Select
-            value={state.selectedCTeamKey}
+            value={currentMonthCTeamKey || ''}
             onChange={(event) =>
               onChange({
                 ...state,
                 selectedCTeamKey: event.target.value as CTeamKey,
+                monthCTeamKeys: {
+                  ...state.monthCTeamKeys,
+                  [monthKey]: event.target.value as CTeamKey,
+                },
               })
             }
           >
+            <option value="" disabled>
+              기존 직접입력값
+            </option>
             {C_TEAM_KEYS.map((key) => (
               <option key={key} value={key}>
                 {state.cTeams[key].label}

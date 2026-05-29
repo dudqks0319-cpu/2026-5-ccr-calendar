@@ -14,6 +14,7 @@ import { C_TEAM_KEYS, DEFAULT_STATE, TEAM_KEYS } from '../constants/defaults.js'
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
 import {
   findMonthStartPointerForAnchors,
+  getMonthCTeamKey,
   generateMonthSchedule,
   getMonthCTeamMembers,
 } from '../logic/generateMonthSchedule.js';
@@ -184,9 +185,8 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
     [state],
   );
   const monthKey = toMonthKey(state.selectedYear, state.selectedMonthIndex);
-  const monthCTeamText = namesToText(
-    state.monthCTeams[monthKey] || getMonthCTeamMembers(state, state.selectedYear, state.selectedMonthIndex),
-  );
+  const monthCTeamKey = getMonthCTeamKey(state, state.selectedYear, state.selectedMonthIndex);
+  const monthCTeamMembers = getMonthCTeamMembers(state, state.selectedYear, state.selectedMonthIndex);
   const activeTabLabel = tabs.find((tab) => tab.key === activeTab)?.label || '설정';
 
   function updateDayTeamMembers(teamKey: TeamKey, members: string[]) {
@@ -266,7 +266,8 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
       ...state.monthStartAnchors[monthKey],
       [anchor.shift]: anchor,
     };
-    const pointer = findMonthStartPointerForAnchors(
+    let anchorsToSave = nextAnchors;
+    let pointer = findMonthStartPointerForAnchors(
       state,
       state.selectedYear,
       state.selectedMonthIndex,
@@ -274,15 +275,28 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
     );
 
     if (pointer === null) {
-      alert('현재 휴무/C조 제외/자재 제외 규칙을 동시에 만족하는 시작 순번을 찾지 못했습니다. 기준일과 전반/후반 근무자를 다시 확인해주세요.');
-      return;
+      pointer = findMonthStartPointerForAnchors(
+        state,
+        state.selectedYear,
+        state.selectedMonthIndex,
+        [anchor],
+      );
+
+      if (pointer === null) {
+        alert('현재 휴무/C조 제외/자재 제외 규칙에서 이 기준 순번을 찾지 못했습니다. 기준일과 전반/후반 근무자를 다시 확인해주세요.');
+        return;
+      }
+
+      anchorsToSave = {
+        [anchor.shift]: anchor,
+      };
     }
 
     onChange({
       ...state,
       monthStartAnchors: {
         ...state.monthStartAnchors,
-        [monthKey]: nextAnchors,
+        [monthKey]: anchorsToSave,
       },
       monthStartPointer: {
         ...state.monthStartPointer,
@@ -350,20 +364,43 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
 
         {activeTab === 'cteam' ? (
           <div className="grid gap-4">
-            <Field label={`${state.selectedYear}년 ${state.selectedMonthIndex + 1}월 C조 표시`}>
-              <Input
-                value={monthCTeamText}
-                onChange={(event) =>
-                  onChange({
-                    ...state,
-                    monthCTeams: {
-                      ...state.monthCTeams,
-                      [monthKey]: parseNames(event.target.value),
-                    },
-                  })
-                }
-              />
-            </Field>
+            <section className="grid gap-3 rounded-lg border border-blue-100 bg-blue-50/60 p-3 sm:grid-cols-[minmax(0,1fr)_240px] sm:items-end sm:p-4">
+              <div>
+                <h3 className="text-base font-black text-slate-950">
+                  {state.selectedYear}년 {state.selectedMonthIndex + 1}월 C조 선택
+                </h3>
+                <p className="mt-1 text-sm font-semibold leading-6 text-slate-600">
+                  월마다 A~E팀을 따로 저장합니다. 달력을 넘겨도 각 월의 C조 선택이 유지됩니다.
+                </p>
+                <p className="mt-2 rounded-md bg-white px-3 py-2 text-sm font-black text-purple-900">
+                  현재 표시: {monthCTeamMembers.join(' ') || '미지정'}
+                </p>
+              </div>
+              <Field label="해당 월 C조">
+                <Select
+                  value={monthCTeamKey || ''}
+                  onChange={(event) =>
+                    onChange({
+                      ...state,
+                      selectedCTeamKey: event.target.value as CTeamKey,
+                      monthCTeamKeys: {
+                        ...state.monthCTeamKeys,
+                        [monthKey]: event.target.value as CTeamKey,
+                      },
+                    })
+                  }
+                >
+                  <option value="" disabled>
+                    기존 직접입력값
+                  </option>
+                  {C_TEAM_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {state.cTeams[key].label} - {namesToText(state.cTeams[key].members)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+            </section>
 
             <div className="grid gap-3 md:grid-cols-2">
               {C_TEAM_KEYS.map((teamKey) => {
@@ -820,6 +857,7 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
                   ...state,
                   dayTeams: DEFAULT_STATE.dayTeams,
                   cTeams: DEFAULT_STATE.cTeams,
+                  monthCTeamKeys: DEFAULT_STATE.monthCTeamKeys,
                   monthCTeams: DEFAULT_STATE.monthCTeams,
                   monthStartPointer: DEFAULT_STATE.monthStartPointer,
                   monthStartAnchors: DEFAULT_STATE.monthStartAnchors,

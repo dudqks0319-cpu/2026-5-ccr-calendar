@@ -1,6 +1,6 @@
 import type { CalendarDay, CCRCalendarState, MonthSchedule } from '../types/ccr.js';
 import { WEEKDAY_LABELS } from '../constants/defaults.js';
-import { getMonthCTeamMembers } from '../logic/generateMonthSchedule.js';
+import { getMonthCTeamKey, getMonthCTeamMembers, getMonthStartWithNight } from '../logic/generateMonthSchedule.js';
 import { toMonthKey } from '../utils/date.js';
 import { DayCell } from './DayCell.js';
 import { Textarea } from './ui.js';
@@ -24,6 +24,9 @@ export function MonthCalendar({
   const monthKey = toMonthKey(schedule.year, schedule.monthIndex);
   const monthMemo = state.monthMemo[monthKey] || '';
   const selectedCTeamNames = getMonthCTeamMembers(state, schedule.year, schedule.monthIndex);
+  const selectedCTeamKey = getMonthCTeamKey(state, schedule.year, schedule.monthIndex);
+  const selectedCTeamLabel = selectedCTeamKey ? state.cTeams[selectedCTeamKey].label : '직접입력 C조';
+  const startWithNight = getMonthStartWithNight(state, schedule.year, schedule.monthIndex);
   const weekRowCount = Math.ceil((emptyPrefix.length + schedule.days.length) / 7);
   const emptySuffix = Array.from(
     { length: weekRowCount * 7 - emptyPrefix.length - schedule.days.length },
@@ -51,7 +54,7 @@ export function MonthCalendar({
               {schedule.year}년 {schedule.monthIndex + 1}월 CCR 근무표
             </h2>
             <p className="text-sm font-medium text-slate-500">
-              {state.startWithNight ? '첫 주 야간 시작' : '첫 주 주간 시작'} · {state.cTeams[state.selectedCTeamKey].label} 선택 · 자동저장
+              {startWithNight ? '첫 주 야간 시작' : '첫 주 주간 시작'} · {selectedCTeamLabel} 선택 · 자동저장
             </p>
           </div>
           <div className="text-sm font-bold text-slate-600">

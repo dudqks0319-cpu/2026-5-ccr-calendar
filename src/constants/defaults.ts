@@ -8,6 +8,10 @@ export const DEFAULT_STATE: CCRCalendarState = {
   selectedMonthIndex: 4,
   startWithNight: false,
   monthStartWithNight: {},
+  monthCTeamKeys: {
+    '2026-05': 'A',
+    '2026-06': 'A',
+  },
   monthCTeams: {
     '2026-04': ['선우', '영빈', '우용'],
     '2026-05': ['민성', '서용', '재령'],

@@ -2,6 +2,7 @@ import type {
   CCRCalendarState,
   CalendarDay,
   CTeamExcludeMode,
+  CTeamKey,
   MaterialRule,
   MonthStartAnchor,
   MonthSchedule,
@@ -92,6 +93,8 @@ export function pickNextWorker(rotation: string[], pointer: number, context: Pic
 export function getCTeamText(dateKey: string, state: CCRCalendarState) {
   const override = state.overrides[dateKey];
   if (override?.cTeamText) return override.cTeamText;
+  const monthCTeamKey = state.monthCTeamKeys[dateKey.slice(0, 7)];
+  if (monthCTeamKey) return state.cTeams[monthCTeamKey]?.members.filter(Boolean).join(', ') || '';
   const monthMembers = state.monthCTeams[dateKey.slice(0, 7)];
   if (monthMembers?.length) return monthMembers.filter(Boolean).join(', ');
   const selectedCTeam = state.cTeams[state.selectedCTeamKey];
@@ -110,9 +113,33 @@ export function getMonthCTeamMembers(
   year: number,
   monthIndex: number,
 ) {
-  const monthMembers = state.monthCTeams[toMonthKey(year, monthIndex)];
+  const monthKey = toMonthKey(year, monthIndex);
+  const monthCTeamKey = state.monthCTeamKeys[monthKey];
+  if (monthCTeamKey) return state.cTeams[monthCTeamKey]?.members.filter(Boolean) || [];
+  const monthMembers = state.monthCTeams[monthKey];
   if (monthMembers?.length) return monthMembers.filter(Boolean);
   return state.cTeams[state.selectedCTeamKey]?.members.filter(Boolean) || [];
+}
+
+export function getMonthCTeamKey(
+  state: CCRCalendarState,
+  year: number,
+  monthIndex: number,
+): CTeamKey | '' {
+  const monthKey = toMonthKey(year, monthIndex);
+  const savedKey = state.monthCTeamKeys[monthKey];
+  if (savedKey) return savedKey;
+
+  const monthMembers = state.monthCTeams[monthKey]?.filter(Boolean);
+  if (monthMembers?.length) {
+    const matched = (Object.keys(state.cTeams) as CTeamKey[]).find((teamKey) => {
+      const members = state.cTeams[teamKey]?.members.filter(Boolean) || [];
+      return members.length === monthMembers.length && members.every((member, index) => member === monthMembers[index]);
+    });
+    return matched || '';
+  }
+
+  return state.selectedCTeamKey;
 }
 
 export function getDateCTeamMembers(
