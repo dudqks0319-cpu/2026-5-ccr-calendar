@@ -371,12 +371,12 @@ test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이
     '2026-06-05': ['찬우', '이진'],
     '2026-06-08': ['이진', '윤수'],
     '2026-06-12': ['승현', '호빈'],
-    '2026-06-15': ['호빈', '광수'],
-    '2026-06-19': ['동인', '민혁'],
-    '2026-06-22': ['민혁', '선우'],
-    '2026-06-26': ['윤수', '성광'],
-    '2026-06-29': ['성광', '성운'],
-    '2026-06-30': ['성운', '승현'],
+    '2026-06-15': ['이진', '윤수'],
+    '2026-06-19': ['승현', '호빈'],
+    '2026-06-22': ['호빈', '광수'],
+    '2026-06-26': ['영빈', '재령'],
+    '2026-06-29': ['호빈', '광수'],
+    '2026-06-30': ['광수', '우용'],
   };
 
   for (const [dateKey, assignment] of Object.entries(expectedAssignments)) {
@@ -392,6 +392,40 @@ test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이
 
   assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-03')?.comment, '지방선거');
   assert.equal(schedule.days.find((day) => day.dateKey === '2026-06-06')?.comment, '현충일');
+});
+
+test('6월은 같은 주야 조의 다음 블록을 직전 후반자부터 이어가고 야간 C조를 제외한다', () => {
+  const state = mergeState({
+    version: 2,
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+    cTeams: {
+      A: {
+        label: 'A팀',
+        members: ['동인', '찬우', '민혁'],
+        departments: {
+          conveyor: ['동인'],
+          robot: ['찬우'],
+          main: ['민혁'],
+        },
+      },
+    } as CCRCalendarState['cTeams'],
+  });
+  const schedule = generateMonthSchedule(state, 2026, 5);
+  const getAssignment = (dateKey: string) => {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    return [day?.am, day?.pm];
+  };
+
+  assert.deepEqual(getAssignment('2026-06-05'), ['선우', '이진']);
+  assert.deepEqual(getAssignment('2026-06-15'), ['이진', '윤수']);
+  assert.deepEqual(getAssignment('2026-06-12'), ['승현', '호빈']);
+  assert.deepEqual(getAssignment('2026-06-22'), ['호빈', '광수']);
+
+  for (const day of schedule.days.filter((item) => item.isNight && !item.isOff)) {
+    assert.equal(['동인', '찬우', '민혁'].includes(day.am), false);
+    assert.equal(['동인', '찬우', '민혁'].includes(day.pm), false);
+  }
 });
 
 test('6월 기본 OFF 토요일은 특근 ON이면 근무일, 특근 OFF이면 다시 OFF가 된다', () => {
@@ -547,7 +581,16 @@ test('저장값 병합은 기존 localStorage가 있어도 새 월별 프리셋 
   });
 
   assert.equal(state.offDays['2026-06-13'], true);
-  assert.equal(state.overrides['2026-06-15']?.am, '호빈');
+  assert.equal(state.overrides['2026-06-15']?.presetAm, '호빈');
+  assert.equal(
+    mergeState({
+      version: 2,
+      overrides: {
+        '2026-06-15': { am: '호빈', pm: '광수' },
+      },
+    }).overrides['2026-06-15']?.presetAm,
+    '호빈',
+  );
   assert.equal(state.monthMemo['2026-06']?.includes('1직 평일 협정'), true);
   assert.deepEqual(
     mergeState({

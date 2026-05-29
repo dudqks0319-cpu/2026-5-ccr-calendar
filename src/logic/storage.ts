@@ -2,7 +2,7 @@ import { C_TEAM_KEYS, DEFAULT_STATE, STORAGE_KEY } from '../constants/defaults.j
 import { applyApril2026PhotoPreset } from '../constants/april2026Preset.js';
 import { applyJune2026PhotoPreset } from '../constants/june2026Preset.js';
 import { applyMay2026PhotoPreset } from '../constants/may2026Preset.js';
-import type { CCRCalendarState } from '../types/ccr.js';
+import type { CCRCalendarState, DayOverride } from '../types/ccr.js';
 import { downloadTextFile, toDateKey } from '../utils/date.js';
 
 function cTeamDepartmentsFromMembers(members: string[]) {
@@ -16,6 +16,40 @@ function cTeamDepartmentsFromMembers(members: string[]) {
 function cloneDefaultState(): CCRCalendarState {
   const state = JSON.parse(JSON.stringify(DEFAULT_STATE)) as CCRCalendarState;
   return applyJune2026PhotoPreset(applyMay2026PhotoPreset(applyApril2026PhotoPreset(state)));
+}
+
+function mergeOverrides(
+  defaultOverrides: Record<string, DayOverride>,
+  parsedOverrides: Record<string, DayOverride> | undefined,
+) {
+  const merged: Record<string, DayOverride> = {
+    ...defaultOverrides,
+    ...parsedOverrides,
+  };
+
+  for (const [dateKey, defaultOverride] of Object.entries(defaultOverrides)) {
+    const parsedOverride = parsedOverrides?.[dateKey];
+    if (!parsedOverride || (!defaultOverride.presetAm && !defaultOverride.presetPm)) continue;
+
+    const nextOverride: DayOverride = {
+      ...defaultOverride,
+      ...parsedOverride,
+    };
+
+    if (defaultOverride.presetAm && parsedOverride.am === defaultOverride.presetAm) {
+      delete nextOverride.am;
+      nextOverride.presetAm = defaultOverride.presetAm;
+    }
+
+    if (defaultOverride.presetPm && parsedOverride.pm === defaultOverride.presetPm) {
+      delete nextOverride.pm;
+      nextOverride.presetPm = defaultOverride.presetPm;
+    }
+
+    merged[dateKey] = nextOverride;
+  }
+
+  return merged;
 }
 
 export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState {
@@ -80,10 +114,7 @@ export function mergeState(parsed: Partial<CCRCalendarState>): CCRCalendarState 
       ...defaults.offDays,
       ...parsed.offDays,
     },
-    overrides: {
-      ...defaults.overrides,
-      ...parsed.overrides,
-    },
+    overrides: mergeOverrides(defaults.overrides, parsed.overrides),
     comments: {
       ...defaults.comments,
       ...parsed.comments,

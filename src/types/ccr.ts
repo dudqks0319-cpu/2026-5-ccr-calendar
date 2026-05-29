@@ -40,6 +40,8 @@ export type MaterialRule = {
 export type DayOverride = {
   am?: string;
   pm?: string;
+  presetAm?: string;
+  presetPm?: string;
   isOff?: boolean;
   cTeamText?: string;
   materialWorker?: string;

@@ -6,6 +6,7 @@ import type {
   MaterialRule,
   MonthStartAnchor,
   MonthSchedule,
+  ShiftStartType,
 } from '../types/ccr.js';
 import { getDaysInMonth, toDateKey, toMonthKey } from '../utils/date.js';
 import { buildBaseRotation } from './buildBaseRotation.js';
@@ -88,6 +89,16 @@ export function pickNextWorker(rotation: string[], pointer: number, context: Pic
     workerName: '',
     nextPointer: currentPointer,
   };
+}
+
+function getWorkerPointer(rotation: string[], workerName: string) {
+  const index = rotation.findIndex((worker) => worker === workerName);
+  return index >= 0 ? index : null;
+}
+
+function getPointerAfterWorker(rotation: string[], workerName: string, fallbackPointer: number) {
+  const index = getWorkerPointer(rotation, workerName);
+  return index === null ? fallbackPointer : index + 1;
 }
 
 export function getCTeamText(dateKey: string, state: CCRCalendarState) {
@@ -236,6 +247,12 @@ export function generateMonthSchedule(
   const legacyPointer = state.monthStartPointer[monthKey] ?? 0;
   let dayPointer = state.monthShiftStartPointer[monthKey]?.day ?? legacyPointer;
   let nightPointer = state.monthShiftStartPointer[monthKey]?.night ?? legacyPointer;
+  const shiftBlockCounts: Record<ShiftStartType, number> = {
+    day: 0,
+    night: 0,
+  };
+  const lastPmByShift: Partial<Record<ShiftStartType, string>> = {};
+  let lastWorkShift: ShiftStartType | null = null;
 
   for (let day = 1; day <= daysInMonth; day += 1) {
     const dateKey = toDateKey(year, monthIndex, day);
@@ -278,7 +295,25 @@ export function generateMonthSchedule(
       continue;
     }
 
+    const shiftType: ShiftStartType = isNight ? 'night' : 'day';
+    const isNewShiftBlock = lastWorkShift !== shiftType;
+    if (isNewShiftBlock) {
+      shiftBlockCounts[shiftType] += 1;
+      const lastPmPointer = lastPmByShift[shiftType]
+        ? getWorkerPointer(baseRotation, lastPmByShift[shiftType] || '')
+        : null;
+      if (shiftBlockCounts[shiftType] > 1 && lastPmPointer !== null) {
+        if (shiftType === 'night') {
+          nightPointer = lastPmPointer;
+        } else {
+          dayPointer = lastPmPointer;
+        }
+      }
+      lastWorkShift = shiftType;
+    }
+
     const pointer = isNight ? nightPointer : dayPointer;
+    const shouldUsePresetAssignment = shiftBlockCounts[shiftType] === 1;
     const pickContext: PickContext = {
       isNight,
       selectedCTeamMembers,
@@ -287,11 +322,16 @@ export function generateMonthSchedule(
       materialRule: state.materialRule,
     };
     const autoAm = pickNextWorker(baseRotation, pointer, pickContext);
-    const canUseOverrideAm =
-      Boolean(override?.am) && !shouldExcludeWorker(override?.am || '', pickContext);
-    const am = canUseOverrideAm ? override?.am || '' : autoAm.workerName;
+    const candidateAm = override?.am || (shouldUsePresetAssignment ? override?.presetAm : '');
+    const canUseCandidateAm =
+      Boolean(candidateAm) && !shouldExcludeWorker(candidateAm || '', pickContext);
+    const am = canUseCandidateAm ? candidateAm || '' : autoAm.workerName;
 
-    const autoPm = pickNextWorker(baseRotation, autoAm.nextPointer, {
+    const usedManualAm = Boolean(override?.am) && canUseCandidateAm;
+    const pmStartPointer = usedManualAm
+      ? getPointerAfterWorker(baseRotation, am, autoAm.nextPointer)
+      : autoAm.nextPointer;
+    const autoPm = pickNextWorker(baseRotation, pmStartPointer, {
       ...pickContext,
       additionalExcludedNames: am ? [am] : [],
     });
@@ -299,9 +339,10 @@ export function generateMonthSchedule(
       ...pickContext,
       additionalExcludedNames: am ? [am] : [],
     };
-    const canUseOverridePm =
-      Boolean(override?.pm) && !shouldExcludeWorker(override?.pm || '', overridePmContext);
-    const pm = canUseOverridePm ? override?.pm || '' : autoPm.workerName;
+    const candidatePm = override?.pm || (shouldUsePresetAssignment ? override?.presetPm : '');
+    const canUseCandidatePm =
+      Boolean(candidatePm) && !shouldExcludeWorker(candidatePm || '', overridePmContext);
+    const pm = canUseCandidatePm ? candidatePm || '' : autoPm.workerName;
 
     days.push({
       dateKey,
@@ -323,10 +364,21 @@ export function generateMonthSchedule(
       userComment: labels.userComment,
     });
 
+    lastPmByShift[shiftType] = pm;
+
+    const usedManualAssignment = Boolean(override?.am || override?.pm);
+    const usedPresetAssignment =
+      !usedManualAssignment &&
+      shouldUsePresetAssignment &&
+      Boolean(override?.presetAm || override?.presetPm);
+    const nextPointer = usedPresetAssignment
+      ? pointer + 1
+      : getWorkerPointer(baseRotation, pm) ?? pointer + 1;
+
     if (isNight) {
-      nightPointer += 1;
+      nightPointer = nextPointer;
     } else {
-      dayPointer += 1;
+      dayPointer = nextPointer;
     }
   }
 
@@ -351,7 +403,13 @@ export function findMonthStartPointerForAnchors(
   const monthKey = toMonthKey(year, monthIndex);
   const scrubbedOverrides = { ...state.overrides };
   for (const anchor of validAnchors) {
-    const { am: _am, pm: _pm, ...rest } = scrubbedOverrides[anchor.dateKey] || {};
+    const {
+      am: _am,
+      pm: _pm,
+      presetAm: _presetAm,
+      presetPm: _presetPm,
+      ...rest
+    } = scrubbedOverrides[anchor.dateKey] || {};
     scrubbedOverrides[anchor.dateKey] = rest;
   }
 
