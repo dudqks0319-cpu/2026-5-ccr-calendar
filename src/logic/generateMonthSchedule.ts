@@ -7,6 +7,7 @@ import type {
   MonthStartAnchor,
   MonthSchedule,
   ShiftStartType,
+  TeamKey,
 } from '../types/ccr.js';
 import { getDaysInMonth, toDateKey, toMonthKey } from '../utils/date.js';
 import { buildBaseRotation } from './buildBaseRotation.js';
@@ -26,8 +27,14 @@ type GeneratedMonth = MonthSchedule & {
   finalPointers: Record<ShiftStartType, number>;
 };
 
+type AnchoredTeamRotation = {
+  nextTeamKey: TeamKey;
+  memberIndexes: Record<TeamKey, number>;
+};
+
 const HOLIDAY_LABELS = ['노동절', '어린이날', '석가탄신일', '지방선거', '현충일'];
 const MONTH_CARRY_LOOKBACK_LIMIT = 36;
+const ROTATION_TEAM_ORDER: TeamKey[] = ['conveyor', 'robot', 'main'];
 
 function normalizeDate(dateKey: string) {
   const date = new Date(dateKey);
@@ -104,6 +111,200 @@ function getWorkerPointer(rotation: string[], workerName: string) {
 function getPointerAfterWorker(rotation: string[], workerName: string, fallbackPointer: number) {
   const index = getWorkerPointer(rotation, workerName);
   return index === null ? fallbackPointer : index + 1;
+}
+
+function getWorkerTeamKey(state: CCRCalendarState, workerName: string): TeamKey | null {
+  for (const teamKey of ROTATION_TEAM_ORDER) {
+    if (state.dayTeams[teamKey].members.includes(workerName)) return teamKey;
+  }
+
+  return null;
+}
+
+function getNextTeamKey(teamKey: TeamKey): TeamKey {
+  const index = ROTATION_TEAM_ORDER.indexOf(teamKey);
+  return ROTATION_TEAM_ORDER[(index + 1) % ROTATION_TEAM_ORDER.length];
+}
+
+function getTeamPointerAfterWorker(
+  state: CCRCalendarState,
+  teamKey: TeamKey,
+  workerName: string,
+  fallbackPointer: number,
+) {
+  const members = state.dayTeams[teamKey].members.filter(Boolean);
+  const index = members.indexOf(workerName);
+  if (index < 0 || members.length === 0) return fallbackPointer;
+  return (index + 1) % members.length;
+}
+
+function getTeamMemberIndex(
+  state: CCRCalendarState,
+  teamKey: TeamKey,
+  workerName: string,
+  fallbackPointer: number,
+) {
+  const members = state.dayTeams[teamKey].members.filter(Boolean);
+  const index = members.indexOf(workerName);
+  if (index < 0 || members.length === 0) return fallbackPointer;
+  return index;
+}
+
+function getDefaultTeamMemberIndexes(
+  state: CCRCalendarState,
+  rotation: string[],
+  pointer: number,
+): Record<TeamKey, number> {
+  const indexes = Object.fromEntries(
+    ROTATION_TEAM_ORDER.map((teamKey) => [teamKey, 0]),
+  ) as Record<TeamKey, number>;
+  const unresolved = new Set<TeamKey>(ROTATION_TEAM_ORDER);
+
+  if (rotation.length === 0) return indexes;
+
+  for (let offset = 0; offset < rotation.length && unresolved.size > 0; offset += 1) {
+    const workerName = rotation[(pointer + offset) % rotation.length];
+    const teamKey = getWorkerTeamKey(state, workerName);
+    if (!teamKey || !unresolved.has(teamKey)) continue;
+    indexes[teamKey] = getTeamMemberIndex(state, teamKey, workerName, indexes[teamKey]);
+    unresolved.delete(teamKey);
+  }
+
+  return indexes;
+}
+
+function getPointerForTeamRotation(
+  state: CCRCalendarState,
+  rotation: string[],
+  teamRotation: AnchoredTeamRotation,
+  fallbackPointer: number,
+) {
+  const members = state.dayTeams[teamRotation.nextTeamKey].members.filter(Boolean);
+  if (members.length === 0) return fallbackPointer;
+  const workerName =
+    members[teamRotation.memberIndexes[teamRotation.nextTeamKey] % members.length];
+  return getWorkerPointer(rotation, workerName) ?? fallbackPointer;
+}
+
+function createAnchoredTeamRotation(
+  state: CCRCalendarState,
+  rotation: string[],
+  pointer: number,
+  am: string,
+  pm: string,
+): AnchoredTeamRotation | null {
+  const amTeamKey = getWorkerTeamKey(state, am);
+  const pmTeamKey = getWorkerTeamKey(state, pm);
+  const nextTeamKey = pmTeamKey || amTeamKey;
+  if (!nextTeamKey) return null;
+
+  const memberIndexes = getDefaultTeamMemberIndexes(state, rotation, pointer);
+
+  if (amTeamKey) {
+    memberIndexes[amTeamKey] = getTeamPointerAfterWorker(
+      state,
+      amTeamKey,
+      am,
+      memberIndexes[amTeamKey],
+    );
+  }
+
+  if (pmTeamKey) {
+    memberIndexes[pmTeamKey] = getTeamPointerAfterWorker(
+      state,
+      pmTeamKey,
+      pm,
+      memberIndexes[pmTeamKey],
+    );
+  }
+
+  return {
+    nextTeamKey,
+    memberIndexes,
+  };
+}
+
+function applyAnchoredManualAssignment(
+  state: CCRCalendarState,
+  teamRotation: AnchoredTeamRotation,
+  am: string,
+  pm: string,
+) {
+  const amTeamKey = getWorkerTeamKey(state, am);
+  const pmTeamKey = getWorkerTeamKey(state, pm);
+
+  if (amTeamKey) {
+    teamRotation.memberIndexes[amTeamKey] = getTeamPointerAfterWorker(
+      state,
+      amTeamKey,
+      am,
+      teamRotation.memberIndexes[amTeamKey],
+    );
+  }
+
+  if (pmTeamKey) {
+    teamRotation.memberIndexes[pmTeamKey] = getTeamPointerAfterWorker(
+      state,
+      pmTeamKey,
+      pm,
+      teamRotation.memberIndexes[pmTeamKey],
+    );
+    teamRotation.nextTeamKey = pmTeamKey;
+    return;
+  }
+
+  if (amTeamKey) {
+    teamRotation.nextTeamKey = amTeamKey;
+  }
+}
+
+function pickNextAnchoredWorker(
+  state: CCRCalendarState,
+  teamRotation: AnchoredTeamRotation,
+  context: PickContext,
+) {
+  const totalMembers = ROTATION_TEAM_ORDER.reduce(
+    (total, teamKey) => total + state.dayTeams[teamKey].members.filter(Boolean).length,
+    0,
+  );
+  const maxAttempts = Math.max(totalMembers * ROTATION_TEAM_ORDER.length, 1);
+  let attempts = 0;
+
+  while (attempts < maxAttempts) {
+    const teamKey = teamRotation.nextTeamKey;
+    const members = state.dayTeams[teamKey].members.filter(Boolean);
+
+    if (members.length === 0) {
+      teamRotation.nextTeamKey = getNextTeamKey(teamKey);
+      attempts += 1;
+      continue;
+    }
+
+    let teamAttempts = 0;
+    while (teamAttempts < members.length && attempts < maxAttempts) {
+      const memberIndex = teamRotation.memberIndexes[teamKey] % members.length;
+      const workerName = members[memberIndex];
+      teamRotation.memberIndexes[teamKey] = (memberIndex + 1) % members.length;
+      attempts += 1;
+
+      if (!shouldExcludeWorker(workerName, context)) {
+        teamRotation.nextTeamKey = getNextTeamKey(teamKey);
+        return {
+          workerName,
+          teamKey,
+        };
+      }
+
+      teamAttempts += 1;
+    }
+
+    teamRotation.nextTeamKey = getNextTeamKey(teamKey);
+  }
+
+  return {
+    workerName: '',
+    teamKey: null as TeamKey | null,
+  };
 }
 
 function getMonthIndexNumber(year: number, monthIndex: number) {
@@ -352,6 +553,7 @@ function generateMonthScheduleWithPointers(
   const daysInMonth = getDaysInMonth(year, monthIndex);
   const firstDayOfMonthWeekday = new Date(year, monthIndex, 1).getDay();
   const baseRotation = buildBaseRotation(state.dayTeams);
+  const monthKey = toMonthKey(year, monthIndex);
   const startWithNight = getMonthStartWithNight(state, year, monthIndex);
   const days: CalendarDay[] = [];
   const initialPointers = getInitialShiftPointers(state, year, monthIndex, depth);
@@ -362,6 +564,8 @@ function generateMonthScheduleWithPointers(
     night: 0,
   };
   const lastPmByShift: Partial<Record<ShiftStartType, string>> = {};
+  const monthStartAnchors = state.monthStartAnchors[monthKey] || {};
+  const anchoredTeamRotations: Partial<Record<ShiftStartType, AnchoredTeamRotation>> = {};
   let lastWorkShift: ShiftStartType | null = null;
 
   for (let day = 1; day <= daysInMonth; day += 1) {
@@ -409,21 +613,23 @@ function generateMonthScheduleWithPointers(
     const isNewShiftBlock = lastWorkShift !== shiftType;
     if (isNewShiftBlock) {
       shiftBlockCounts[shiftType] += 1;
-      const lastPmPointer = lastPmByShift[shiftType]
-        ? getWorkerPointer(baseRotation, lastPmByShift[shiftType] || '')
-        : null;
-      if (shiftBlockCounts[shiftType] > 1 && lastPmPointer !== null) {
-        if (shiftType === 'night') {
-          nightPointer = lastPmPointer;
-        } else {
-          dayPointer = lastPmPointer;
+      const anchoredRotation = anchoredTeamRotations[shiftType];
+      if (!anchoredRotation) {
+        const lastPmPointer = lastPmByShift[shiftType]
+          ? getWorkerPointer(baseRotation, lastPmByShift[shiftType] || '')
+          : null;
+        if (shiftBlockCounts[shiftType] > 1 && lastPmPointer !== null) {
+          if (shiftType === 'night') {
+            nightPointer = lastPmPointer;
+          } else {
+            dayPointer = lastPmPointer;
+          }
         }
       }
       lastWorkShift = shiftType;
     }
 
     const pointer = isNight ? nightPointer : dayPointer;
-    const shouldUsePresetAssignment = shiftBlockCounts[shiftType] === 1;
     const pickContext: PickContext = {
       isNight,
       selectedCTeamMembers,
@@ -431,28 +637,69 @@ function generateMonthScheduleWithPointers(
       cTeamExcludeMode: state.cTeamExcludeMode,
       materialRule: state.materialRule,
     };
-    const autoAm = pickNextWorker(baseRotation, pointer, pickContext);
-    const candidateAm = override?.am || (shouldUsePresetAssignment ? override?.presetAm : '');
-    const canUseCandidateAm =
-      Boolean(candidateAm) && !shouldExcludeWorker(candidateAm || '', pickContext);
-    const am = canUseCandidateAm ? candidateAm || '' : autoAm.workerName;
+    const startAnchor = monthStartAnchors[shiftType];
+    const isStartAnchorDate =
+      startAnchor?.dateKey === dateKey && Boolean(startAnchor.am && startAnchor.pm);
+    let anchoredRotation = anchoredTeamRotations[shiftType];
+    let am = '';
+    let pm = '';
 
-    const usedManualAm = Boolean(override?.am) && canUseCandidateAm;
-    const pmStartPointer = usedManualAm
-      ? getPointerAfterWorker(baseRotation, am, autoAm.nextPointer)
-      : autoAm.nextPointer;
-    const autoPm = pickNextWorker(baseRotation, pmStartPointer, {
-      ...pickContext,
-      additionalExcludedNames: am ? [am] : [],
-    });
-    const overridePmContext = {
-      ...pickContext,
-      additionalExcludedNames: am ? [am] : [],
-    };
-    const candidatePm = override?.pm || (shouldUsePresetAssignment ? override?.presetPm : '');
-    const canUseCandidatePm =
-      Boolean(candidatePm) && !shouldExcludeWorker(candidatePm || '', overridePmContext);
-    const pm = canUseCandidatePm ? candidatePm || '' : autoPm.workerName;
+    if (isStartAnchorDate) {
+      am = startAnchor?.am || '';
+      pm = startAnchor?.pm || '';
+      anchoredRotation = createAnchoredTeamRotation(state, baseRotation, pointer, am, pm) || undefined;
+      anchoredTeamRotations[shiftType] = anchoredRotation;
+    } else if (anchoredRotation) {
+      const candidateAm = override?.am || '';
+      if (candidateAm) {
+        am = candidateAm;
+      } else {
+        const autoAm = pickNextAnchoredWorker(state, anchoredRotation, pickContext);
+        am = autoAm.workerName;
+      }
+
+      const candidatePm = override?.pm || '';
+      if (candidatePm) {
+        pm = candidatePm;
+      } else {
+        const autoPm = pickNextAnchoredWorker(state, anchoredRotation, {
+          ...pickContext,
+          additionalExcludedNames: am ? [am] : [],
+        });
+        pm = autoPm.workerName;
+      }
+
+      if (override?.am || override?.pm) {
+        applyAnchoredManualAssignment(state, anchoredRotation, am, pm);
+      } else {
+        const pmTeamKey = getWorkerTeamKey(state, pm);
+        if (pmTeamKey) anchoredRotation.nextTeamKey = pmTeamKey;
+      }
+    } else {
+      const shouldUsePresetAssignment = shiftBlockCounts[shiftType] === 1;
+      const autoAm = pickNextWorker(baseRotation, pointer, pickContext);
+      const candidateAm = override?.am || (shouldUsePresetAssignment ? override?.presetAm : '');
+      const canUseCandidateAm =
+        Boolean(candidateAm) && !shouldExcludeWorker(candidateAm || '', pickContext);
+      am = canUseCandidateAm ? candidateAm || '' : autoAm.workerName;
+
+      const usedManualAm = Boolean(override?.am) && canUseCandidateAm;
+      const pmStartPointer = usedManualAm
+        ? getPointerAfterWorker(baseRotation, am, autoAm.nextPointer)
+        : autoAm.nextPointer;
+      const autoPm = pickNextWorker(baseRotation, pmStartPointer, {
+        ...pickContext,
+        additionalExcludedNames: am ? [am] : [],
+      });
+      const overridePmContext = {
+        ...pickContext,
+        additionalExcludedNames: am ? [am] : [],
+      };
+      const candidatePm = override?.pm || (shouldUsePresetAssignment ? override?.presetPm : '');
+      const canUseCandidatePm =
+        Boolean(candidatePm) && !shouldExcludeWorker(candidatePm || '', overridePmContext);
+      pm = canUseCandidatePm ? candidatePm || '' : autoPm.workerName;
+    }
 
     days.push({
       dateKey,
@@ -476,14 +723,23 @@ function generateMonthScheduleWithPointers(
 
     lastPmByShift[shiftType] = pm;
 
+    const anchoredNextPointer = anchoredTeamRotations[shiftType]
+      ? getPointerForTeamRotation(
+          state,
+          baseRotation,
+          anchoredTeamRotations[shiftType],
+          pointer + 1,
+        )
+      : null;
     const usedManualAssignment = Boolean(override?.am || override?.pm);
     const usedPresetAssignment =
+      anchoredNextPointer === null &&
       !usedManualAssignment &&
-      shouldUsePresetAssignment &&
+      shiftBlockCounts[shiftType] === 1 &&
       Boolean(override?.presetAm || override?.presetPm);
-    const nextPointer = usedPresetAssignment
-      ? pointer + 1
-      : getWorkerPointer(baseRotation, pm) ?? pointer + 1;
+    const nextPointer =
+      anchoredNextPointer ??
+      (usedPresetAssignment ? pointer + 1 : getWorkerPointer(baseRotation, pm) ?? pointer + 1);
 
     if (isNight) {
       nightPointer = nextPointer;

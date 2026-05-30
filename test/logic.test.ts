@@ -361,6 +361,125 @@ test('주야 기준이 서로 충돌해도 적용한 단일 기준은 역산할 
   assert.equal(findMonthStartPointerForAnchors(state, 2026, 5, [dayAnchor]), 6);
 });
 
+test('첫 시작 전반/후반 기준은 단일 포인터가 아니어도 팀별 다음 순번으로 이어진다', () => {
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+    cTeamExcludeMode: 'none',
+    monthStartWithNight: {
+      '2026-06': true,
+    },
+    monthStartPointer: {
+      '2026-06': 6,
+    },
+    monthStartAnchors: {
+      '2026-06': {
+        night: {
+          dateKey: '2026-06-01',
+          shift: 'night',
+          am: '우용',
+          pm: '선우',
+        },
+      },
+    },
+  });
+  const schedule = generateMonthSchedule(state, 2026, 5);
+  const getAssignment = (dateKey: string) => {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    return [day?.am, day?.pm];
+  };
+
+  assert.deepEqual(getAssignment('2026-06-01'), ['우용', '선우']);
+  assert.deepEqual(getAssignment('2026-06-02'), ['윤수', '서용']);
+  assert.deepEqual(getAssignment('2026-06-03'), ['찬우', '재령']);
+});
+
+test('주간 첫 시작 기준도 전반/후반 근무자의 팀별 다음 순번으로 이어진다', () => {
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+    cTeamExcludeMode: 'none',
+    monthStartWithNight: {
+      '2026-06': true,
+    },
+    monthStartPointer: {
+      '2026-06': 6,
+    },
+    monthStartAnchors: {
+      '2026-06': {
+        day: {
+          dateKey: '2026-06-08',
+          shift: 'day',
+          am: '동인',
+          pm: '서용',
+        },
+      },
+    },
+  });
+  const schedule = generateMonthSchedule(state, 2026, 5);
+  const getAssignment = (dateKey: string) => {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    return [day?.am, day?.pm];
+  };
+
+  assert.deepEqual(getAssignment('2026-06-08'), ['동인', '서용']);
+  assert.deepEqual(getAssignment('2026-06-09'), ['찬우', '민혁']);
+  assert.deepEqual(getAssignment('2026-06-10'), ['이진', '선우']);
+});
+
+test('첫 시작 이후 야간 C조는 같은 팀의 다음 순번으로 건너뛴다', () => {
+  const cTeamMembers = ['선우', '서용', '재령'];
+  const state = stateWith({
+    selectedYear: 2026,
+    selectedMonthIndex: 5,
+    cTeamExcludeMode: 'nightOnly',
+    monthStartWithNight: {
+      '2026-06': true,
+    },
+    monthStartPointer: {
+      '2026-06': 6,
+    },
+    monthCTeamKeys: {
+      '2026-06': 'A',
+    },
+    cTeams: {
+      ...DEFAULT_STATE.cTeams,
+      A: {
+        label: 'A팀',
+        members: cTeamMembers,
+        departments: {
+          conveyor: ['선우'],
+          robot: ['서용'],
+          main: ['재령'],
+        },
+      },
+    },
+    monthStartAnchors: {
+      '2026-06': {
+        night: {
+          dateKey: '2026-06-01',
+          shift: 'night',
+          am: '우용',
+          pm: '선우',
+        },
+      },
+    },
+  });
+  const schedule = generateMonthSchedule(state, 2026, 5);
+  const getAssignment = (dateKey: string) => {
+    const day = schedule.days.find((item) => item.dateKey === dateKey);
+    return [day?.am, day?.pm];
+  };
+
+  assert.deepEqual(getAssignment('2026-06-01'), ['우용', '선우']);
+  assert.deepEqual(getAssignment('2026-06-02'), ['윤수', '찬우']);
+  assert.deepEqual(getAssignment('2026-06-03'), ['성광', '민혁']);
+  for (const day of schedule.days.filter((item) => item.isNight && !item.isOff && item.dateKey !== '2026-06-01')) {
+    assert.equal(cTeamMembers.includes(day.am), false);
+    assert.equal(cTeamMembers.includes(day.pm), false);
+  }
+});
+
 test('2026년 6월 프리셋은 5월 30일 후반 동인 다음 순번부터 이어지고 토요일 특근이 없다', () => {
   const state = mergeState({
     version: 2,

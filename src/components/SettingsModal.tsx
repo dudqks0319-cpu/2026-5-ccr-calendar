@@ -13,7 +13,6 @@ import type {
 import { C_TEAM_KEYS, DEFAULT_STATE, TEAM_KEYS } from '../constants/defaults.js';
 import { buildBaseRotation } from '../logic/buildBaseRotation.js';
 import {
-  findMonthStartPointerForAnchors,
   getMonthCTeamKey,
   generateMonthSchedule,
   getMonthCTeamMembers,
@@ -266,50 +265,20 @@ export function SettingsModal({ state, onChange, onClose }: SettingsModalProps) 
       ...state.monthStartAnchors[monthKey],
       [anchor.shift]: anchor,
     };
-    let anchorsToSave = nextAnchors;
-    let pointer = findMonthStartPointerForAnchors(
-      state,
-      state.selectedYear,
-      state.selectedMonthIndex,
-      Object.values(nextAnchors).filter(Boolean) as MonthStartAnchor[],
-    );
-
-    if (pointer === null) {
-      pointer = findMonthStartPointerForAnchors(
-        state,
-        state.selectedYear,
-        state.selectedMonthIndex,
-        [anchor],
-      );
-
-      if (pointer === null) {
-        alert('현재 휴무/C조 제외/자재 제외 규칙에서 이 기준 순번을 찾지 못했습니다. 기준일과 전반/후반 근무자를 다시 확인해주세요.');
-        return;
-      }
-
-      anchorsToSave = {
-        [anchor.shift]: anchor,
-      };
-    }
+    const nextShiftPointers = {
+      ...state.monthShiftStartPointer[monthKey],
+    };
+    delete nextShiftPointers[anchor.shift];
 
     onChange({
       ...state,
       monthStartAnchors: {
         ...state.monthStartAnchors,
-        [monthKey]: anchorsToSave,
-      },
-      monthStartPointer: {
-        ...state.monthStartPointer,
-        [monthKey]: pointer,
+        [monthKey]: nextAnchors,
       },
       monthShiftStartPointer: {
         ...state.monthShiftStartPointer,
-        [monthKey]: {
-          ...state.monthShiftStartPointer[monthKey],
-          ...Object.fromEntries(
-            Object.keys(anchorsToSave).map((shift) => [shift, pointer]),
-          ),
-        },
+        [monthKey]: nextShiftPointers,
       },
     });
   }
