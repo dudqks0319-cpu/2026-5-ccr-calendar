@@ -27,7 +27,7 @@ function includesSearch(day: CalendarDay, searchTerm: string) {
 export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
   const matched = includesSearch(day, searchTerm);
   const displayCTeamText = day.cTeamText.replaceAll(',', '');
-  const topLabel = day.holidayName || day.weekTeamLabel || day.specialWorkLabel;
+  const topLabel = day.holidayName || day.specialWorkLabel || day.weekTeamLabel;
   const userMemo = day.userComment.trim();
   const isSaturdayOff = day.dayOfWeek === 6 && day.isOff;
   const isSunday = day.dayOfWeek === 0;
@@ -53,7 +53,9 @@ export function DayCell({ day, searchTerm, onClick }: DayCellProps) {
         <div className={`min-w-0 break-words text-base font-black leading-tight sm:text-xl ${isSunday ? 'text-[#c82032]' : day.dayOfWeek === 6 ? 'text-[#176fc0]' : 'text-slate-950'}`}>
           {day.day}
           {topLabel ? (
-            <span className={`ml-1 align-middle text-[10px] font-black leading-tight sm:ml-2 sm:text-xs ${day.holidayName ? 'text-[#c82032]' : 'text-[#123d72]'}`}>
+            <span className={`ml-1 align-middle text-[10px] font-black leading-tight sm:ml-2 sm:text-xs ${
+              day.holidayName || day.specialWorkLabel ? 'text-[#c82032]' : 'text-[#123d72]'
+            }`}>
               {topLabel}
             </span>
           ) : null}

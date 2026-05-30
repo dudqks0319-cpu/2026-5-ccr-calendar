@@ -10,6 +10,8 @@ type DayEditModalProps = {
   onClose: () => void;
 };
 
+const NON_PRODUCTION_SPECIAL_WORK_LABEL = '비생산특근';
+
 function setRecordValue<T>(
   record: Record<string, T>,
   key: string,
@@ -30,6 +32,9 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
   const isCurrentSaturdayOvertime =
     day.dayOfWeek === 6 &&
     (override.isSaturdayOvertime ?? state.saturdayOvertime[day.dateKey]) === true;
+  const isNonProductionSpecialWork =
+    override.specialWorkLabel === NON_PRODUCTION_SPECIAL_WORK_LABEL ||
+    day.specialWorkLabel === NON_PRODUCTION_SPECIAL_WORK_LABEL;
 
   function updateOverride(nextOverride: typeof override) {
     const nextOverrides = { ...state.overrides };
@@ -64,7 +69,7 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
   return (
     <Modal title={`${day.dateKey} 수정`} onClose={onClose} width="max-w-2xl">
       <div className="grid gap-5">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <Button
             type="button"
             variant={isCurrentlyOff ? 'danger' : 'secondary'}
@@ -108,6 +113,25 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
           >
             특근 {isCurrentSaturdayOvertime ? 'ON' : 'OFF'}
           </Button>
+          <Button
+            type="button"
+            variant={isNonProductionSpecialWork ? 'danger' : 'secondary'}
+            onClick={() => {
+              const nextOverride = {
+                ...override,
+                specialWorkLabel: isNonProductionSpecialWork
+                  ? undefined
+                  : NON_PRODUCTION_SPECIAL_WORK_LABEL,
+              };
+              if (isNonProductionSpecialWork) {
+                delete nextOverride.specialWorkLabel;
+              }
+              updateOverride(nextOverride);
+            }}
+            aria-pressed={isNonProductionSpecialWork}
+          >
+            {isNonProductionSpecialWork ? '비생산특근 표시됨' : '비생산특근'}
+          </Button>
           <div className="rounded-md bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
             {day.isNight ? '야간 주차' : '주간 주차'}
           </div>
@@ -125,6 +149,7 @@ export function DayEditModal({ day, state, onChange, onClose }: DayEditModalProp
         >
           현재 상태: {isCurrentlyOff ? '휴무일' : '근무일'}
           {isManualOffChange ? ' · 수동 변경 적용됨' : ''}
+          {isNonProductionSpecialWork ? ' · 비생산특근 표시' : ''}
         </div>
 
         <datalist id="worker-list">
